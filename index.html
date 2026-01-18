@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nutz Poker Timer</title>
+    <meta name="description" content="Gestionnaire de tournoi de Poker : Chronomètre, Blindes, Gestion des joueurs.">
+    
+    <!-- Librairie externe pour l'effet de confettis (victoire) -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        /* 
+         * =========================================
+         * 1. VARIABLES & THÈMES
+         * =========================================
+         */
+        :root {
+            /* Palette Dark Mode (Défaut) */
+            --bg-color: #000000;
+            --card-bg: rgba(28, 28, 30, 0.75);
+            --card-border: rgba(255, 255, 255, 0.12);
+            --accent-green: #30d158;
+            --accent-red: #ff453a;
+            --accent-blue: #0a84ff;
+            --accent-gray: #2c2c2e;
+            --text-primary: #ffffff;
+            --text-secondary: #8e8e93;
+            --input-bg: rgba(0,0,0,0.3);
+            
+            --font-stack: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            --bg-gradient: radial-gradient(circle at 50% 0%, #1c1c1e 0%, #000 90%);
+            --chip-bg: rgba(255,255,255,0.1);
+        }
+
+        /* Palette Light Mode */
+        body.light-mode {
+            --bg-color: #f2f2f7;
+            --card-bg: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(0, 0, 0, 0.05);
+            --accent-green: #34c759;
+            --accent-gray: #e5e5ea;
+            --text-primary: #000000;
+            --text-secondary: #6e6e73;
+            --input-bg: rgba(0,0,0,0.05);
+            --bg-gradient: radial-gradient(circle at 50% 0%, #ffffff 0%, #f2f2f7 90%);
+            --chip-bg: rgba(0,0,0,0.06);
+        }
+
+        /* =========================================
+         * 2. STYLE GLOBAL (RESET)
+         * =========================================
+         */
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-stack);
+            display: flex;
+            justify-content: center;
+            min-height: 100vh;
+            background-image: var(--bg-gradient);
+            -webkit-font-smoothing: antialiased;
+            overflow-x: hidden;
+            transition: background 0.3s, color 0.3s;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px; /* Largeur idéale type mobile */
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            position: relative;
+            z-index: 1; 
+        }
+
+        /* =========================================
+         * 3. HEADER
+         * =========================================
+         */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 5px;
+            height: 50px;
+        }
+
+        h1 { 
+            font-size: 1.1rem; 
+            font-weight: 700; 
+            letter-spacing: -0.3px; 
+            white-space: nowrap; 
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            max-width: 65%;
+        }
+
+        .header-btn {
+            background: rgba(255,255,255,0.1);
+            border: none;
+            color: var(--accent-blue);
+            font-size: 0.9rem;
+            cursor: pointer;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: background 0.2s;
+        }
+        body.light-mode .header-btn { background: rgba(0,0,0,0.05); }
+        .header-btn:active { opacity: 0.7; }
+
+        /* =========================================
+         * 4. COMPOSANTS UI PRINCIPAUX
+         * =========================================
+         */
+        /* Panneau vitré (Glassmorphism) */
+        .glass-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 22px;
+            padding: 30px 20px;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            transition: transform 0.3s ease;
+        }
+
+        /* Indicateurs (Blindes, Niveau) */
+        .level-indicator {
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .blinds-large {
+            font-size: 3.2rem;
+            font-weight: 800;
+            letter-spacing: -1.5px;
+            line-height: 1.1;
+            margin: 8px 0;
+            /* Gradient text effect for sleek look */
+            background: linear-gradient(180deg, var(--text-primary) 0%, var(--text-secondary) 150%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .next-blinds-wrapper {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+            background: var(--accent-gray);
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 12px;
+            border-radius: 20px;
+            gap: 5px;
+        }
+
+        .ante-badge {
+            display: inline-block;
+            background: var(--accent-gray);
+            color: var(--text-secondary);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            min-width: 60px;
+            transition: all 0.3s;
+        }
+        .ante-badge.active { 
+            color: var(--accent-blue); 
+            background: rgba(10, 132, 255, 0.15); 
+        }
+
+        /* Chronomètre */
+        .timer-digits {
+            font-size: 5rem;
+            font-weight: 200;
+            font-variant-numeric: tabular-nums; /* Empêche les chiffres de bouger */
+            letter-spacing: -2px;
+            margin: 10px 0 30px 0;
+            color: var(--text-primary);
+            line-height: 1;
+        }
+        .timer-digits.warning { color: var(--accent-red); }
+        .timer-digits.paused { opacity: 0.4; }
+
+        /* Contrôles (Boutons Play/Stop) */
+        .controls {
+            display: flex;
+            gap: 12px;
+            justify-content: stretch;
+            align-items: stretch;
+        }
+
+        .btn {
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.1s, background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 56px; /* Hauteur fixe pour alignement */
+            font-size: 1rem;
+            color: var(--text-primary);
+            position: relative;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn svg { display: block; } /* Fix SVG baseline issues */
+
+        /* Bouton start large */
+        .btn-main {
+            background-color: var(--accent-green);
+            color: white;
+            font-weight: 600;
+            font-size: 1.1rem;
+            flex-grow: 2; /* Prend plus de place */
+        }
+        .btn-main.stop { background-color: var(--accent-red); }
+
+        /* Boutons latéraux plus petits */
+        .btn-secondary {
+            background-color: var(--accent-gray);
+            flex-grow: 1;
+            width: 60px; /* Minimum width */
+        }
+        
+        .full-width { width: 100%; }
+
+        /* =========================================
+         * 5. GESTION DES JOUEURS
+         * =========================================
+         */
+        .players-section { margin-top: 10px; padding: 0 5px; }
+
+        .mode-switch {
+            display: flex;
+            background: var(--accent-gray);
+            border-radius: 10px;
+            padding: 3px;
+            margin-bottom: 15px;
+        }
+        .mode-opt {
+            flex: 1;
+            text-align: center;
+            padding: 6px;
+            font-size: 0.8rem;
+            border-radius: 8px;
+            cursor: pointer;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+        .mode-opt.active {
+            background: var(--card-bg);
+            color: var(--text-primary);
+            font-weight: 600;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .player-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            gap: 10px;
+            margin-top: 15px;
+        }
+        
+        .player-chip {
+            background: var(--chip-bg);
+            padding: 10px 12px;
+            border-radius: 12px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-primary);
+            border: 1px solid transparent;
+        }
+        .player-chip:hover { border-color: var(--card-border); }
+        
+        .btn-x { 
+            background:none; 
+            border:none; 
+            color: var(--text-secondary); 
+            font-size:1.2rem; 
+            cursor: pointer; 
+            margin-left: 5px;
+            padding: 0 4px;
+            line-height: 1;
+        }
+        .btn-x:hover { color: var(--accent-red); }
+
+        .empty-msg {
+            text-align: center;
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            padding: 30px 0;
+            font-style: italic;
+            opacity: 0.7;
+        }
+
+        /* Compteur Simple */
+        .counter-ui {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 40px;
+        }
+        .counter-display { font-size: 4rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .btn-circle {
+            width: 55px; height: 55px; border-radius: 50%;
+            background: var(--accent-gray); color: var(--text-primary);
+            border: none; font-size: 1.8rem; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.1s;
+        }
+        .btn-circle:active { transform: scale(0.9); }
+
+        /* =========================================
+         * 6. PARAMÈTRES (SETTINGS)
+         * =========================================
+         */
+        #settings-view { display: none; padding-bottom: 60px; }
+        
+        .section-title { 
+            font-size: 0.8rem; 
+            color: var(--text-secondary); 
+            margin: 25px 0 10px 5px; 
+            text-transform:uppercase; 
+            letter-spacing:1px; 
+            font-weight:600; 
+        }
+
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 8px; color: var(--text-secondary); font-size: 0.9rem; margin-left: 5px; }
+        
+        input[type="text"], input[type="number"], textarea {
+            background: var(--input-bg);
+            border: 1px solid var(--card-border);
+            color: var(--text-primary);
+            padding: 14px;
+            border-radius: 12px;
+            outline: none;
+            font-family: inherit;
+            font-size: 1rem;
+            width: 100%;
+            transition: border 0.3s;
+        }
+        input:focus, textarea:focus { border-color: var(--accent-blue); }
+
+        .code-area { height: 160px; font-family: "SF Mono", Consolas, monospace; font-size: 0.85rem; line-height: 1.4; }
+        .import-area { height: 80px; font-family: inherit; margin-bottom: 8px; }
+        
+        /* Bouton Switch iOS */
+        .switch-row { 
+            display: flex; justify-content: space-between; align-items: center; 
+            margin-bottom: 20px; background: var(--input-bg); padding: 12px 14px; border-radius: 12px; border: 1px solid var(--card-border);
+        }
+        .switch-row label { margin: 0; font-size: 1rem; }
+        
+        .switch { position: relative; display: inline-block; width: 50px; height: 30px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--card-border); transition: .3s; border-radius: 34px; }
+        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 2px; bottom: 2px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        input:checked + .slider { background-color: var(--accent-green); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        .divider { height: 1px; background: var(--card-border); margin: 30px 0; }
+        .hidden { display: none !important; }
+
+        /* GitHub Link */
+        .github-link {
+            display: flex; align-items: center; justify-content: center; gap: 12px;
+            color: var(--text-secondary); text-decoration: none; padding: 15px;
+            border-radius: 14px; background: var(--accent-gray); margin-top: 15px;
+            transition: all 0.2s;
+        }
+        .github-link:hover { color: var(--text-primary); background: var(--card-border); }
+        .github-link svg { fill: currentColor; }
+
+        /* =========================================
+         * 7. MODAL VICTOIRE
+         * =========================================
+         */
+        #victory-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9);
+            backdrop-filter: blur(15px);
+            z-index: 1000;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 30px;
+        }
+        .winner-trophy { font-size: 6rem; margin-bottom: 20px; animation: bounce 2s infinite; }
+        .winner-title { font-size: 1.2rem; color: var(--text-secondary); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 2px; }
+        .winner-name { 
+            font-size: 3.5rem; font-weight: 800; color: #ffd700; margin-bottom: 50px; 
+            text-shadow: 0 0 40px rgba(255, 215, 0, 0.3); word-break: break-all;
+        }
+        
+        @keyframes bounce { 
+            0%, 100% {transform: translateY(0);} 
+            50% {transform: translateY(-20px);} 
+        }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- Header -->
+    <header>
+        <h1 id="tournament-title">Nutz Poker Tournament</h1>
+        <button class="header-btn" id="btn-settings-toggle" onclick="toggleView()">Réglages</button>
+    </header>
+
+    <!-- === VUE PRINCIPALE === -->
+    <div id="main-view">
+        
+        <!-- Panneau Chrono -->
+        <div class="glass-panel">
+            <div class="level-indicator">Niveau <span id="lvl-num">1</span></div>
+            
+            <div class="blinds-large" id="blinds-val">-- / --</div>
+            
+            <div class="next-blinds-wrapper">
+                <span class="label">Suivant:</span>
+                <span id="next-blinds">-- / --</span>
+            </div>
+
+            <!-- Badge Ante visible uniquement si > 0 -->
+            <div id="ante-container" class="ante-badge">Ante: <span id="ante-val">0</span></div>
+            
+            <div class="timer-digits" id="timer">00:00</div>
+
+            <!-- CONTROLES -->
+            <div class="controls">
+                <!-- Bouton Précédent -->
+                <button class="btn btn-secondary" onclick="changeLevel(-1)" title="Précédent">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                </button>
+                
+                <!-- Bouton Principal (Démarrer/Pause) -->
+                <button class="btn btn-main" id="btn-action" onclick="toggleTimer()">
+                    Démarrer
+                </button>
+
+                <!-- Bouton Suivant -->
+                <button class="btn btn-secondary" onclick="changeLevel(1)" title="Suivant">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                </button>
+
+                <!-- Bouton Reset (Masqué selon demande, présent dans le code si besoin) -->
+                <!-- 
+                <button class="btn btn-secondary" onclick="resetCurrentLevel()">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </button> 
+                -->
+            </div>
+        </div>
+
+        <!-- Section Joueurs -->
+        <div class="players-section">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding: 0 5px;">
+                <span style="color:var(--text-secondary); font-size:0.9rem;">Joueurs restants</span>
+                <!-- Onglets Noms / Compteur -->
+                <div class="mode-switch" style="width: 160px; margin-bottom:0;">
+                    <div class="mode-opt active" id="mode-opt-names" onclick="switchPlayerMode('names')">Noms</div>
+                    <div class="mode-opt" id="mode-opt-count" onclick="switchPlayerMode('count')">123</div>
+                </div>
+            </div>
+
+            <!-- Vue Liste -->
+            <div id="wrapper-names">
+                <div class="player-grid" id="p-list"></div>
+                <div id="players-empty-msg" class="empty-msg hidden">Aucun joueur enregistré</div>
+                <div style="margin-top:10px; text-align:right; color:var(--text-secondary); font-size:0.85rem; padding-right:5px;">
+                    Total: <span id="count-names-display" style="font-weight:700; color:var(--text-primary);">0</span>
+                </div>
+            </div>
+
+            <!-- Vue Compteur Simple -->
+            <div id="wrapper-count" class="hidden">
+                <div class="glass-panel counter-ui" style="margin-top:10px;">
+                    <button class="btn-circle" onclick="adjustCount(-1)">−</button>
+                    <div class="counter-display" id="count-simple-display">0</div>
+                    <button class="btn-circle" onclick="adjustCount(1)">+</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === VUE REGLAGES === -->
+    <div id="settings-view">
+        <h2 style="margin: 10px 0 25px 0; font-size: 1.8rem; font-weight:700;">Configuration</h2>
+        
+        <div class="form-group">
+            <label>Nom du tournoi</label>
+            <input type="text" id="cfg-title" placeholder="Ex: Poker Night" oninput="updateTitleLive(this.value)">
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Ajout Rapide de Joueurs</div>
+        
+        <div class="form-group">
+            <textarea id="cfg-players-area" class="import-area" placeholder="Collez une liste de noms ici..."></textarea>
+            <button class="btn btn-main full-width" style="height:46px; border-radius:12px; font-size:0.95rem; background-color:var(--accent-blue);" onclick="processPlayerInput()">
+                + Ajouter la liste
+            </button>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Structure du Jeu</div>
+
+        <div class="form-group">
+            <label>Durée des rounds (minutes)</label>
+            <!-- Valeur par défaut 20 min -->
+            <input type="number" id="cfg-duration" value="20">
+        </div>
+        
+        <div class="switch-row">
+            <label for="cfg-ante">Activer les Ante</label>
+            <label class="switch">
+                <input type="checkbox" id="cfg-ante" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <div class="form-group">
+            <label>Blindes (Format: SB/BB/Ante)</label>
+            <textarea id="cfg-structure" class="code-area"></textarea>
+        </div>
+        
+        <div style="height:20px;"></div>
+        
+        <button class="btn btn-main full-width" style="border-radius:14px; font-weight:700;" onclick="saveSettings()">
+            Valider et Retour
+        </button>
+
+        <div class="divider"></div>
+
+        <div class="section-title">Préférences</div>
+
+        <div class="switch-row">
+            <label for="cfg-theme">Mode Clair (Light)</label>
+            <label class="switch">
+                <input type="checkbox" id="cfg-theme" onchange="toggleTheme()">
+                <span class="slider"></span>
+            </label>
+        </div>
+
+        <a href="https://github.com/jjllrrvvrr" target="_blank" class="github-link">
+            <!-- Logo GitHub SVG -->
+            <svg width="24" height="24" viewBox="0 0 24 24">
+                <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12"/>
+            </svg>
+            <div style="display:flex; flex-direction:column; align-items:flex-start;">
+                <span style="font-size:0.7rem; font-weight:400; opacity:0.8;">Développé par</span>
+                <span style="font-weight:600; font-size:0.95rem;">jjllrrvvrr</span>
+            </div>
+        </a>
+    </div>
+
+    <!-- === MODAL VICTOIRE === -->
+    <div id="victory-modal">
+        <div class="winner-trophy">🏆</div>
+        <div class="winner-title">Le gagnant est</div>
+        <div class="winner-name" id="winner-name">Joueur</div>
+        <button class="btn btn-main" style="width:200px;" onclick="closeVictory()">Fermer</button>
+    </div>
+
+</div>
+
+<!-- Audio hidden -->
+<audio id="sfx-alarm" src="https://assets.mixkit.co/sfx/preview/mixkit-alarm-digital-clock-beep-989.mp3" preload="auto"></audio>
+
+<script>
+    /* 
+     * =========================================
+     * LOGIQUE JAVASCRIPT
+     * =========================================
+     */
+    
+    // Structure classique par défaut
+    const defaultStructure = `25/50
+50/100
+75/150
+100/200
+100/200/200
+200/400/200
+300/600/300
+400/800/400
+500/1000/500
+600/1200/600
+800/1600/800
+1000/2000/1000
+1500/3000/1500
+2000/4000/2000
+3000/6000/3000
+5000/10000/5000`;
+
+    // État global de l'application
+    let state = {
+        isRunning: false,
+        gameHasStarted: false,
+        timeRemaining: 20 * 60, // 20 minutes par défaut
+        settings: {
+            title: "Tournoi de Poker",
+            levelDuration: 20, 
+            useAnte: true,
+            rawText: defaultStructure
+        },
+        levels: [],
+        currentLevelIndex: 0,
+        timerInterval: null,
+        trackingMode: 'names', // 'names' ou 'count'
+        players: [],
+        simpleCount: 6 // Joueurs par défaut (mode simple)
+    };
+
+    // Cache des éléments DOM pour performance
+    const els = {
+        mainView: document.getElementById('main-view'),
+        settingsView: document.getElementById('settings-view'),
+        victoryModal: document.getElementById('victory-modal'),
+        headerTitle: document.getElementById('tournament-title'),
+        btnToggle: document.getElementById('btn-settings-toggle'),
+        timer: document.getElementById('timer'),
+        blinds: document.getElementById('blinds-val'),
+        anteContainer: document.getElementById('ante-container'),
+        ante: document.getElementById('ante-val'),
+        lvlNum: document.getElementById('lvl-num'),
+        nextBlinds: document.getElementById('next-blinds'),
+        btnAction: document.getElementById('btn-action'),
+        cfgTitle: document.getElementById('cfg-title'),
+        cfgDuration: document.getElementById('cfg-duration'),
+        cfgAnte: document.getElementById('cfg-ante'),
+        cfgStructure: document.getElementById('cfg-structure'),
+        cfgPlayersArea: document.getElementById('cfg-players-area'),
+        cfgTheme: document.getElementById('cfg-theme'),
+        modeOptNames: document.getElementById('mode-opt-names'),
+        modeOptCount: document.getElementById('mode-opt-count'),
+        wrapperNames: document.getElementById('wrapper-names'),
+        wrapperCount: document.getElementById('wrapper-count'),
+        pList: document.getElementById('p-list'),
+        emptyMsg: document.getElementById('players-empty-msg'),
+        countNamesDisplay: document.getElementById('count-names-display'),
+        countSimpleDisplay: document.getElementById('count-simple-display'),
+        winnerName: document.getElementById('winner-name'),
+        audio: document.getElementById('sfx-alarm')
+    };
+
+    /* --- INITIALISATION --- */
+    function init() {
+        // Chargement des valeurs par défaut dans les inputs
+        els.cfgStructure.value = defaultStructure;
+        els.cfgDuration.value = state.settings.levelDuration;
+        
+        parseLevels();
+        updateDisplay();
+        renderPlayers();
+    }
+
+    /* --- NAVIGATION & THEME --- */
+    function toggleView() {
+        if(els.settingsView.style.display === 'block') {
+            // Fermer les réglages
+            els.settingsView.style.display = 'none';
+            els.mainView.style.display = 'block';
+            els.btnToggle.textContent = "Réglages";
+        } else {
+            // Ouvrir les réglages
+            els.cfgTitle.value = state.settings.title;
+            els.cfgDuration.value = state.settings.levelDuration;
+            els.cfgAnte.checked = state.settings.useAnte;
+            els.cfgStructure.value = state.settings.rawText;
+            
+            els.mainView.style.display = 'none';
+            els.settingsView.style.display = 'block';
+            els.btnToggle.textContent = "Fermer";
+            window.scrollTo(0,0);
+        }
+    }
+
+    function toggleTheme() {
+        document.body.classList.toggle('light-mode');
+    }
+
+    /* --- GESTION DES DONNÉES --- */
+    function updateTitleLive(val) {
+        state.settings.title = val;
+        els.headerTitle.textContent = val || "Poker Tournament";
+    }
+
+    function saveSettings() {
+        // 1. Titre
+        state.settings.title = els.cfgTitle.value.trim() || "Poker Tournament";
+        els.headerTitle.textContent = state.settings.title;
+        
+        // 2. Durée (Mise à jour immédiate si chrono en pause)
+        const dur = parseInt(els.cfgDuration.value);
+        if(dur > 0) {
+            state.settings.levelDuration = dur;
+            if(!state.isRunning) {
+                state.timeRemaining = dur * 60;
+            }
+        }
+        
+        // 3. Ante & Structure
+        state.settings.useAnte = els.cfgAnte.checked;
+        state.settings.rawText = els.cfgStructure.value;
+        parseLevels();
+        
+        // 4. Retour
+        toggleView();
+        updateDisplay();
+    }
+
+    function parseLevels() {
+        // Analyse le texte ligne par ligne
+        state.levels = state.settings.rawText.split('\n')
+            .map(line => line.trim())
+            .filter(line => line.length > 0)
+            .map(line => {
+                const parts = line.split(/[/-]/);
+                return {
+                    sb: parts[0] ? parts[0].trim() : '?',
+                    bb: parts[1] ? parts[1].trim() : '?',
+                    ant: parts[2] ? parts[2].trim() : null 
+                };
+            });
+    }
+
+    /* --- LOGIQUE CHRONO --- */
+    function toggleTimer() {
+        if(state.isRunning) {
+            pauseTimer();
+        } else {
+            startTimer();
+        }
+    }
+
+    function startTimer() {
+        state.isRunning = true;
+        state.gameHasStarted = true;
+        els.btnAction.textContent = "Pause";
+        els.btnAction.classList.add('stop');
+        
+        // Anti-doublon d'intervalle
+        if(state.timerInterval) clearInterval(state.timerInterval);
+
+        state.timerInterval = setInterval(() => {
+            if(state.timeRemaining > 0) {
+                state.timeRemaining--;
+                updateTimerDisplay();
+            } else {
+                levelComplete();
+            }
+        }, 1000);
+    }
+
+    function pauseTimer() {
+        state.isRunning = false;
+        clearInterval(state.timerInterval);
+        els.btnAction.textContent = "Continuer";
+        els.btnAction.classList.remove('stop');
+        els.timer.classList.add('paused');
+    }
+
+    function updateTimerDisplay() {
+        const m = Math.floor(state.timeRemaining / 60);
+        const s = state.timeRemaining % 60;
+        els.timer.textContent = 
+            (m < 10 ? "0" + m : m) + ":" + 
+            (s < 10 ? "0" + s : s);
+        
+        if(state.timeRemaining < 60 && state.timeRemaining > 0) {
+            els.timer.classList.add('warning');
+        } else {
+            els.timer.classList.remove('warning');
+        }
+        
+        if(state.isRunning) els.timer.classList.remove('paused');
+    }
+
+    function changeLevel(delta) {
+        let newIndex = state.currentLevelIndex + delta;
+        if(newIndex >= 0 && newIndex < state.levels.length) {
+            state.currentLevelIndex = newIndex;
+            resetCurrentLevel(); 
+            updateDisplay();
+        }
+    }
+
+    function resetCurrentLevel() {
+        state.timeRemaining = state.settings.levelDuration * 60;
+        updateTimerDisplay();
+        // Si le jeu est en pause, on met à jour l'affichage "Pause" etc
+        if(!state.isRunning) els.timer.classList.add('paused');
+    }
+
+    function levelComplete() {
+        // Tenter de jouer le son
+        try { els.audio.play().catch(e => console.log('Audio blocked', e)); } catch(e) {}
+
+        if(state.currentLevelIndex < state.levels.length - 1) {
+            // Passage automatique au niveau suivant
+            state.currentLevelIndex++;
+            state.timeRemaining = state.settings.levelDuration * 60;
+            updateDisplay();
+            // Le setInterval continue de tourner, le chrono ne s'arrête pas
+        } else {
+            // Fin du tournoi
+            pauseTimer();
+            alert("Structure terminée !");
+        }
+    }
+
+    function updateDisplay() {
+        updateTimerDisplay();
+        els.lvlNum.textContent = state.currentLevelIndex + 1;
+
+        const cur = state.levels[state.currentLevelIndex];
+        if(cur) {
+            els.blinds.textContent = `${cur.sb} / ${cur.bb}`;
+            
+            // Logique Ante
+            let anteVal = 0;
+            if(state.settings.useAnte) {
+                // Si la ligne contient un 3ème nombre, c'est l'ante
+                if(cur.ant) anteVal = cur.ant; 
+            }
+            
+            if(anteVal > 0) {
+                els.ante.textContent = anteVal;
+                els.anteContainer.classList.add('active');
+            } else {
+                els.ante.textContent = "0";
+                els.anteContainer.classList.remove('active');
+            }
+        }
+
+        // Blindes Suivantes
+        const next = state.levels[state.currentLevelIndex + 1];
+        if(next) {
+            els.nextBlinds.textContent = `${next.sb} / ${next.bb}`;
+        } else {
+            els.nextBlinds.textContent = "Fin";
+        }
+    }
+
+    /* --- GESTION JOUEURS --- */
+    function processPlayerInput() {
+        const raw = els.cfgPlayersArea.value;
+        if(!raw.trim()) return;
+        
+        const items = raw.split(/\n|,/);
+        let added = false;
+        
+        items.forEach(item => {
+            const name = item.trim();
+            if(name && !state.players.includes(name)) {
+                state.players.push(name);
+                added = true;
+            }
+        });
+
+        if(added) {
+            els.cfgPlayersArea.value = "";
+            renderPlayers();
+            toggleView(); // Retour auto à la vue principale
+        }
+    }
+
+    function switchPlayerMode(mode) {
+        state.trackingMode = mode;
+        if(mode === 'names') {
+            els.modeOptNames.classList.add('active');
+            els.modeOptCount.classList.remove('active');
+            els.wrapperNames.classList.remove('hidden');
+            els.wrapperCount.classList.add('hidden');
+        } else {
+            els.modeOptNames.classList.remove('active');
+            els.modeOptCount.classList.add('active');
+            els.wrapperNames.classList.add('hidden');
+            els.wrapperCount.classList.remove('hidden');
+            renderPlayers(); // Synchro compteurs
+        }
+    }
+
+    function removePlayer(idx) {
+        if(confirm(`Éliminer ${state.players[idx]} ?`)) {
+            state.players.splice(idx, 1);
+            renderPlayers();
+            checkVictory();
+        }
+    }
+
+    function adjustCount(delta) {
+        const newVal = state.simpleCount + delta;
+        if(newVal >= 0) {
+            state.simpleCount = newVal;
+            renderPlayers();
+            if(delta < 0) checkVictory();
+        }
+    }
+
+    function renderPlayers() {
+        els.countSimpleDisplay.textContent = state.simpleCount;
+        els.countNamesDisplay.textContent = state.players.length;
+
+        els.pList.innerHTML = '';
+        if(state.players.length === 0) {
+            els.emptyMsg.classList.remove('hidden');
+        } else {
+            els.emptyMsg.classList.add('hidden');
+            state.players.forEach((name, i) => {
+                const div = document.createElement('div');
+                div.className = 'player-chip';
+                div.innerHTML = `
+                    <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:120px; font-weight:500;">${name}</span>
+                    <button class="btn-x" onclick="removePlayer(${i})" title="Éliminer">&times;</button>
+                `;
+                els.pList.appendChild(div);
+            });
+        }
+    }
+
+    /* --- VICTOIRE --- */
+    function checkVictory() {
+        if(!state.gameHasStarted) return;
+        
+        if(state.trackingMode === 'names') {
+            if(state.players.length === 1) triggerVictory(state.players[0]);
+        } else {
+            if(state.simpleCount === 1) triggerVictory("Vainqueur");
+        }
+    }
+
+    function triggerVictory(name) {
+        pauseTimer();
+        els.winnerName.textContent = name;
+        els.victoryModal.style.display = 'flex';
+        
+        // Effet confettis
+        var end = Date.now() + 5000;
+        (function frame() {
+            confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#30d158', '#0a84ff', '#ffd700'] });
+            confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#30d158', '#0a84ff', '#ffd700'] });
+            if (Date.now() < end) requestAnimationFrame(frame);
+        }());
+    }
+
+    function closeVictory() {
+        els.victoryModal.style.display = 'none';
+        confetti.reset();
+    }
+
+    // Lancement
+    init();
+
+</script>
+</body>
+</html>
