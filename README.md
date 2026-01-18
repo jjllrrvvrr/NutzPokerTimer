@@ -9,9 +9,7 @@
 Nutz Poker Timer est une application web tout-en-un ("Single File") conçue pour gérer vos soirées poker entre amis sans prise de tête. Pas d'installation, pas de base de données, juste du pur plaisir de jeu.
 
 🔗 **[DÉMO LIVE ICI](https://poker.jlrvr.be)**
-
-![Screenshot]([https://via.placeholder.com/800x400.png?text=Capture+d%27écran+de+Nutz+Poker](https://github.com/jjllrrvvrr/NutzPokerTimer/blob/main/screen.jpg?raw=true)]) 
-
+![Screenshot](https://github.com/jjllrrvvrr/NutzPokerTimer/blob/main/screen.jpg) 
 
 ## ✨ Fonctionnalités "Vibe Coded"
 
