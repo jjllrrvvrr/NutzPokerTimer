@@ -9,7 +9,7 @@
 
 ## 🚀 Pourquoi Nutz Poker Clock ?
 
-- **Design "Full Tilt" Spirit** : Une interface sombre style Apple, optimisée pour la visibilité même à l'autre bout de la pièce.
+- **Design Spirit** : Une interface sombre style Apple, optimisée pour la visibilité même à l'autre bout de la pièce.
 - **Chrono Turbo & Blindes** : Gestion automatique des niveaux avec transitions fluides.
 - **Player Tracking** : Gérez vos survivants par leurs noms (pour la gloire) ou par simple compteur.
 - **Victory Animation** : Une pluie de confettis pour le dernier "Shark" encore debout.
