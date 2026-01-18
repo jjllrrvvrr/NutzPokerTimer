@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Nutz Poker Pro</title>
+    <title>Nutz Poker Timer</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
         :root {
@@ -248,12 +248,11 @@
     <nav class="nav">
         <h1 id="ui-tourney-name">NUTZ POKER</h1>
         <div class="nav-right">
-            <a href="https://github.com/jjllrrvvrr/nutz-poker" target="_blank" class="icon-btn" title="GitHub">
+            <a href="https://github.com/jjllrrvvrr/NutzPokerTimer" target="_blank" class="icon-btn" title="GitHub">
                 <svg viewBox="0 0 24 24"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"></path></svg>
             </a>
             <button onclick="toggleFS()" class="icon-btn" title="Plein écran"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
             <button onclick="toggleTheme()" class="icon-btn" id="theme-icon" title="Thème"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
-            <!-- Bouton MUTE/UNMUTE -->
             <button onclick="toggleMute()" class="icon-btn" id="mute-icon" title="Son">
                 <svg viewBox="0 0 24 24" id="icon-sound-on"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
             </button>
@@ -322,10 +321,11 @@
                             <option value="auto">Auto (10-15% du field)</option>
                             <option value="1">Winner Takes All</option>
                             <option value="2">Top 2</option>
-                            <option value="3">Top 3</option>
-                            <option value="custom">Personnalisé...</option>
+                            <option value="3">Top 3 (Clasico)</option>
+                            <option value="custom">Répartition perso...</option>
                         </select>
-                        <input type="number" id="in-paid-custom" style="display:none; margin-top:5px;" placeholder="Combien de joueurs payés ?">
+                        <input type="text" id="in-paid-custom-str" style="display:none; margin-top:5px;" placeholder="Ex: 50/30/20 ou 25/10/5">
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Entrez soit des pourcentages (ex: 50/30/20) soit les montants exacts (ex: 25/10/5).</p>
                     </div>
                 </div>
 
@@ -385,18 +385,17 @@
         }
 
         // --- STATE & AUDIO ---
-        let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaid: 3, players: [], structure: [], isPause: false };
+        let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false };
         let clock = null;
         
         // SON AMONG US
         const alarmSound = new Audio("https://www.myinstants.com/media/sounds/among.mp3");
 
         function unlockAudio() {
-            // Astuce mobile : jouer et pauser instantanément pour débloquer le son au clic
             alarmSound.play().then(() => {
                 alarmSound.pause();
                 alarmSound.currentTime = 0;
-            }).catch(() => {}); // Ignore si erreur
+            }).catch(() => {}); 
         }
 
         function playTone() {
@@ -410,25 +409,20 @@
         function toggleMute() { state.muted = !state.muted; render(); }
         
         function triggerAlert() {
-            // Audio
             playTone();
-            
-            // Stroboscope
             let count = 0;
             const originalTheme = state.theme;
             const flash = setInterval(() => {
                 const current = document.body.getAttribute('data-theme');
                 document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
                 count++;
-                if(count > 5) {
-                    clearInterval(flash);
-                    document.body.setAttribute('data-theme', originalTheme);
-                }
+                if(count > 5) { clearInterval(flash); document.body.setAttribute('data-theme', originalTheme); }
             }, 150);
         }
 
         function toggleCustomPaid() {
-            document.getElementById('in-paid-custom').style.display = (document.getElementById('in-paid-select').value === 'custom') ? 'block' : 'none';
+            const isCustom = document.getElementById('in-paid-select').value === 'custom';
+            document.getElementById('in-paid-custom-str').style.display = isCustom ? 'block' : 'none';
         }
         
         function setMode(m) {
@@ -444,7 +438,6 @@
             const chk = document.getElementById('in-antes-toggle');
             const txt = document.getElementById('in-blinds');
             let lines = txt.value.split('\n');
-
             const newLines = lines.map(line => {
                 let cleanLine = line.trim();
                 if(!cleanLine) return "";
@@ -475,7 +468,7 @@
             state.buyin = parseInt(document.getElementById('in-buy').value) || 0;
             state.duration = parseInt(document.getElementById('in-dur').value) || 15;
             state.paidMode = document.getElementById('in-paid-select').value;
-            state.customPaid = parseInt(document.getElementById('in-paid-custom').value) || 3;
+            state.customPaidStr = document.getElementById('in-paid-custom-str').value;
             state.structure = document.getElementById('in-blinds').value.split('\n').filter(l => l.trim());
             
             if (state.mode === 'qty') {
@@ -490,57 +483,70 @@
             state.timeLeft = state.duration * 60; 
             state.playing = false;
             clearInterval(clock); 
-            save(); 
-            render(); 
-            closeSettings();
+            save(); render(); closeSettings();
         }
 
         function getPayouts() {
             const pot = state.players.length * state.buyin;
             if(pot <= 0) return [];
             
-            let nPaid;
-            if(state.paidMode === 'auto') {
-                const n = state.players.length;
-                nPaid = n>40? 10 : n>20? 7 : n>10? 5 : n>5? 3 : n>3? 2 : 1; 
+            let weights = [];
+            
+            if(state.paidMode === 'custom') {
+                // Parse format "50/30/20" ou "25/10/5"
+                weights = state.customPaidStr.split(/\/|;|\,| /).map(s => parseFloat(s)).filter(n => !isNaN(n) && n > 0);
+                if(weights.length === 0) weights = [1];
             } else {
-                nPaid = (state.paidMode === 'custom') ? state.customPaid : parseInt(state.paidMode);
+                let nPaid;
+                if(state.paidMode === 'auto') {
+                    const n = state.players.length;
+                    nPaid = n>40?10 : n>20?7 : n>10?5 : n>5?3 : 2; 
+                } else {
+                    nPaid = parseInt(state.paidMode);
+                }
+                if(nPaid > state.players.length) nPaid = state.players.length;
+                
+                if(nPaid === 1) weights = [100];
+                else if(nPaid === 2) weights = [65, 35];
+                else if(nPaid === 3) weights = [50, 30, 20];
+                else if(nPaid === 4) weights = [45, 25, 20, 10];
+                else {
+                    for(let i=0; i<nPaid; i++) weights.push(100/Math.pow(1.5, i));
+                }
             }
-            if(nPaid > state.players.length) nPaid = state.players.length;
-            if(nPaid < 1) nPaid = 1;
-
-            let pcts = [];
-            if(nPaid === 1) pcts = [1.0];
-            else if(nPaid === 2) pcts = [0.65, 0.35];
-            else if(nPaid === 3) pcts = [0.50, 0.30, 0.20];
-            else if(nPaid === 4) pcts = [0.45, 0.25, 0.20, 0.10];
-            else {
-                let sum = 0;
-                for(let i=0; i<nPaid; i++) { let s = 1/Math.pow(1.8, i); pcts.push(s); sum+=s; }
-                pcts = pcts.map(x => x/sum);
-            }
-
-            let step = (pot < 20) ? 1 : 5;
-            let payouts = pcts.map(p => Math.round((p * pot) / step) * step);
+            
+            const totalWeight = weights.reduce((a,b) => a+b, 0);
+            
+            // Si le pot est petit (<100€), on arrondit à 1€ près. Sinon à 5€.
+            let step = (pot < 100) ? 1 : 5;
+            
+            let rawPayouts = weights.map(w => (w / totalWeight) * pot);
+            let payouts = rawPayouts.map(r => Math.max(step, Math.round(r / step) * step));
+            
             let currentSum = payouts.reduce((a,b) => a+b, 0);
             let diff = pot - currentSum;
 
+            // Ajustement pour correspondre pile au pot
             if(diff !== 0) {
-                if(diff < 0) {
+                if(diff > 0) payouts[0] += diff; // On ajoute le reste au 1er
+                else {
+                    // On retire le trop perçu au dernier, puis avant-dernier, etc.
                     let idx = payouts.length - 1;
-                    while(diff < 0 && idx >= 0) {
-                        payouts[idx] -= step; diff += step; idx--;
-                        if(idx < 0) idx = payouts.length - 1;
+                    while(diff < 0) {
+                         payouts[idx] -= step;
+                         diff += step;
+                         if(payouts[idx] < step) { payouts[idx] = step; diff -= step; idx--; if(idx<0) idx=0; } // Safety
                     }
-                } else {
-                    payouts[0] += diff;
                 }
             }
 
+            // Lissage final : s'assurer que P(n) >= P(n+1)
             for(let i=0; i<payouts.length-1; i++) {
                 if(payouts[i] < payouts[i+1]) {
-                     const t = payouts[i] + payouts[i+1];
-                     payouts[i] = Math.ceil(t/2); payouts[i+1] = Math.floor(t/2);
+                    // Si le 2e gagne plus que le 1er (rare mais possible avec arrondi), on swap
+                    let total = payouts[i] + payouts[i+1];
+                    payouts[i] = Math.ceil(total/2/step)*step;
+                    payouts[i+1] = total - payouts[i];
                 }
             }
 
@@ -564,7 +570,6 @@
                 else blindsText = parts.join(' / ');
             }
             document.getElementById('ui-blinds').innerText = blindsText;
-            
             document.getElementById('ui-level-num').innerText = `Niveau ${state.level + 1}`;
             
             const nextL = state.structure[state.level + 1];
@@ -574,8 +579,7 @@
                 else {
                     let np = nextL.split('/');
                     np = np.filter(p => !p.toUpperCase().includes('PAUSE'));
-                    if(np.length===3) nextText = `${np[0]}/${np[1]}(${np[2]})`;
-                    else nextText = np.join('/');
+                    nextText = np.length===3 ? `${np[0]}/${np[1]}(${np[2]})` : np.join('/');
                 }
             }
             document.getElementById('ui-next').innerText = "Suivant: " + nextText;
@@ -603,25 +607,23 @@
             
             const muteIcon = document.getElementById('mute-icon');
             if (state.muted) {
-                // Icone mute (barrée)
                 muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
                 muteIcon.style.opacity = "0.5";
             } else {
-                // Icone son (ondes)
                 muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
                 muteIcon.style.opacity = "1";
             }
         }
 
         function toggleTimer() {
-            unlockAudio(); // Important pour mobile
+            unlockAudio(); 
             if(state.playing) { clearInterval(clock); state.playing = false; }
             else { state.playing = true; clock = setInterval(() => { state.timeLeft--; if(state.timeLeft < 0) handleLevelEnd(); render(); }, 1000); }
             render();
         }
 
         function handleLevelEnd() {
-            triggerAlert(); // Lance le stroboscope et le son
+            triggerAlert();
             const line = state.structure[state.level] || "";
             if(!state.isPause && line.toUpperCase().includes("PAUSE")) {
                 state.isPause = true; state.timeLeft = (parseInt(line.toUpperCase().split("PAUSE")[1]) || 5) * 60;
@@ -631,7 +633,7 @@
             }
         }
         function changeLvl(dir) { 
-            unlockAudio(); // Important pour mobile
+            unlockAudio(); 
             state.level = Math.max(0, Math.min(state.structure.length - 1, state.level + dir)); 
             if(dir > 0) triggerAlert(); 
             state.isPause = false; state.timeLeft = state.duration * 60; render(); 
@@ -640,7 +642,7 @@
         function resetApp() { if(confirm("Supprimer toutes les données et recommencer ?")) { localStorage.removeItem('nutz_pro_v6'); location.reload(); } }
         
         function openSettings() { 
-            unlockAudio(); // Toujours bon a prendre
+            unlockAudio();
             document.getElementById('in-name').value = state.name;
             document.getElementById('in-buy').value = state.buyin;
             document.getElementById('in-dur').value = state.duration;
@@ -649,7 +651,13 @@
                 let parts = l.split('/');
                 return parts.length >= 3 && !parts[2].toUpperCase().includes('PAUSE');
             });
-            document.getElementById('in-antes-toggle').checked = hasAnte; 
+            document.getElementById('in-antes-toggle').checked = hasAnte;
+            
+            // Restore Custom String
+            document.getElementById('in-paid-select').value = state.paidMode;
+            document.getElementById('in-paid-custom-str').value = state.customPaidStr || "";
+            toggleCustomPaid();
+
             document.getElementById('modal').style.display = 'flex'; 
         }
         function closeSettings() { document.getElementById('modal').style.display = 'none'; }
