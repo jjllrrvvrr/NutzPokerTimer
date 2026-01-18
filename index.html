@@ -2,7 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Nutz Poker Pro</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <style>
@@ -35,193 +35,185 @@
             flex-direction: column;
             overflow: hidden;
             transition: background 0.3s ease;
+            -webkit-tap-highlight-color: transparent;
         }
 
-        /* HEADER & ICONS */
+        /* HEADER */
         .nav {
-            padding: 12px 30px;
+            padding: env(safe-area-inset-top) 20px 10px 20px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border);
-            flex-shrink: 0;
-            background: var(--bg);
+            z-index: 10;
         }
+        .nav h1 { font-size: 15px; font-weight: 600; margin: 0; }
 
-        .nav h1 { font-size: 17px; font-weight: 600; margin: 0; letter-spacing: -0.2px; }
-        .nav-right { display: flex; gap: 15px; align-items: center; }
-
-        .icon-btn { 
-            background: none; border: none; cursor: pointer; padding: 5px; 
-            display: flex; align-items: center; color: var(--accent); opacity: 0.8; transition: 0.2s;
-        }
-        .icon-btn:hover { opacity: 1; transform: scale(1.1); }
-        .icon-btn svg { fill: currentColor; }
-
-        /* LAYOUT */
+        /* MAIN LAYOUT RESPONSIVE */
         .main-container {
             flex: 1;
-            display: grid;
-            grid-template-columns: 320px 1fr 320px;
+            display: flex;
+            position: relative;
             overflow: hidden;
         }
 
-        /* SIDEBARS */
-        .sidebar {
+        .screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
             padding: 20px;
-            border-right: 1px solid var(--border);
+            transition: 0.3s;
+        }
+
+        /* PANELS (SIDEBARS) */
+        .panel {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+            background: var(--bg);
+            z-index: 5;
+            padding: 20px;
             overflow-y: auto;
-            height: 100%;
+            transform: translateX(100%);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         }
-        .sidebar::-webkit-scrollbar { width: 4px; }
-        .sidebar::-webkit-scrollbar-thumb { background: var(--secondary); border-radius: 10px; }
-        .sidebar-right { border-right: none; border-left: 1px solid var(--border); }
-
-        /* CONTENT */
-        .content {
-            display: flex; flex-direction: column;
-            justify-content: center; align-items: center;
-            text-align: center; background: var(--bg);
-        }
-
-        #timer { 
-            font-size: 10vw; font-weight: 700; letter-spacing: -4px; 
-            font-variant-numeric: tabular-nums; margin: 0;
+        .panel.active { transform: translateX(0); }
+        .panel-left { left: 0; transform: translateX(-100%); border-right: 1px solid var(--border); }
+        
+        @media (min-width: 900px) {
+            .panel { position: relative; transform: translateX(0); width: 300px; display: block; }
+            .panel-left { transform: translateX(0); }
+            .mobile-tabs { display: none !important; }
         }
 
-        .blinds-display { font-size: 5.5rem; font-weight: 600; margin: 10px 0; }
-        .level-tag { color: var(--secondary); text-transform: uppercase; font-size: 13px; font-weight: 700; letter-spacing: 2px; }
+        /* TIMER & BLINDS */
+        #ui-blinds { font-size: clamp(3rem, 15vw, 6rem); font-weight: 800; line-height: 1; margin: 10px 0; }
+        #timer { font-size: clamp(4rem, 20vw, 10rem); font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -2px; }
+        .level-tag { color: var(--secondary); text-transform: uppercase; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
 
-        /* ROWS */
-        .list-header { font-size: 11px; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 15px; display: block; position: sticky; top: 0; padding-bottom: 10px; }
-        .row { display: flex; justify-content: space-between; padding: 12px 10px; border-bottom: 0.5px solid var(--border); font-size: 14px; border-radius: 8px; margin-bottom: 2px; cursor: pointer; transition: 0.2s; }
-        .row:hover { background: var(--card); }
-        .row.out { color: var(--secondary); opacity: 0.6; }
-        .rank-tag { font-size: 10px; background: var(--border); padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold; color: var(--secondary); }
+        /* LISTS */
+        .list-header { font-size: 11px; color: var(--secondary); font-weight: 700; text-transform: uppercase; margin-bottom: 15px; display: block; }
+        .row { display: flex; justify-content: space-between; padding: 15px 12px; border-bottom: 1px solid var(--border); font-size: 15px; border-radius: 10px; margin-bottom: 2px; }
+        .row.out { opacity: 0.4; text-decoration: line-through; }
+        .rank-tag { background: var(--btn); padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px; vertical-align: middle; }
+
+        /* MOBILE BOTTOM TABS */
+        .mobile-tabs {
+            display: flex;
+            background: var(--card);
+            border-top: 1px solid var(--border);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            color: var(--secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+        .tab-btn.active { color: var(--accent); }
 
         /* CONTROLS */
-        .footer-controls { padding: 25px; display: flex; justify-content: center; gap: 15px; border-top: 1px solid var(--border); background: var(--bg); }
-        button { background: var(--btn); color: var(--accent); border: none; padding: 12px 24px; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: 0.2s; }
-        button:active { opacity: 0.7; }
-        .btn-primary { background: var(--accent); color: var(--bg); }
+        .controls {
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            border-top: 1px solid var(--border);
+        }
+        button { background: var(--btn); color: var(--accent); border: none; padding: 15px 25px; border-radius: 14px; font-weight: 600; font-size: 14px; cursor: pointer; }
+        .btn-main { background: var(--accent); color: var(--bg); flex: 1; max-width: 200px; }
 
         /* MODAL */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 100; backdrop-filter: blur(15px); }
-        .modal-content { width: 90%; max-width: 750px; background: var(--card); padding: 30px; border-radius: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 30px; max-height: 90vh; overflow-y: auto; color: var(--accent); }
-        textarea, input, select { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--accent); padding: 10px; margin-top: 5px; font-size: 14px; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.9); z-index: 100; padding: 20px; display: none; overflow-y: auto; }
+        .modal-content { background: var(--card); padding: 25px; border-radius: 20px; width: 100%; max-width: 500px; margin: auto; }
+        textarea, input { width: 100%; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; color: var(--accent); padding: 12px; margin: 8px 0; font-size: 16px; box-sizing: border-box; }
+        
+        .icon-btn { background: none; color: var(--accent); padding: 8px; display: flex; align-items: center; }
     </style>
 </head>
-<body data-theme="dark">
+<body>
 
     <nav class="nav">
-        <h1 id="ui-tourney-name">NUTZ POKER PRO</h1>
-        <div class="nav-right">
-    
-            <!-- Fullscreen -->
-            <button onclick="toggleFS()" class="icon-btn" title="Plein écran">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
+        <h1 id="ui-tourney-name">NUTZ POKER</h1>
+        <div style="display:flex; gap:10px">
+            <button onclick="toggleFS()" class="icon-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg>
             </button>
-
-            <!-- Theme Toggle -->
-            <button onclick="toggleTheme()" class="icon-btn" id="theme-icon">
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-            </button> 
-            <!-- GitHub Link -->
-            <a href="https://github.com/jjllrrvvrr" target="_blank" class="icon-btn" title="GitHub Source">
-                <svg height="22" width="22" viewBox="0 0 16 16"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>
-            </a>    
-            <button onclick="openSettings()" class="btn-primary">Réglages</button>
+            <button onclick="toggleTheme()" class="icon-btn" id="theme-icon"></button>
+            <button onclick="openSettings()" style="padding: 8px 15px; font-size: 12px;">Settings</button>
         </div>
     </nav>
 
     <div class="main-container">
-        <aside class="sidebar">
-            <span class="list-header">Survivants &middot; <span id="ui-count">0</span></span>
+        <!-- JOUEURS -->
+        <aside id="panel-players" class="panel panel-left">
+            <span class="list-header">Survivants: <span id="ui-count">0</span></span>
             <div id="ui-player-list"></div>
         </aside>
 
-        <main class="content">
-            <div id="ui-pause-notif" style="color:#ff9f0a; font-weight: 800; display:none; margin-bottom:10px;">PAUSE EN COURS</div>
-            <span class="level-tag" id="ui-level-num">Niveau 1</span>
-            <div class="blinds-display" id="ui-blinds">25 / 50</div>
+        <!-- CHRONO -->
+        <main class="screen">
+            <span class="level-tag" id="ui-level-num">NIVEAU 1</span>
+            <div id="ui-blinds">25/50</div>
             <div id="timer">15:00</div>
-            <span class="level-tag" id="ui-next" style="opacity: 0.5;">Suivant: 50/100</span>
+            <span class="level-tag" id="ui-next" style="opacity:0.6">Suivant: 50/100</span>
         </main>
 
-        <aside class="sidebar sidebar-right">
-            <span class="list-header">Récompenses &middot; <span id="ui-total-pot">0</span>€</span>
+        <!-- PAYOUTS -->
+        <aside id="panel-payouts" class="panel panel-right">
+            <span class="list-header">Prix &middot; <span id="ui-total-pot">0</span>€</span>
             <div id="ui-payouts"></div>
         </aside>
     </div>
 
-    <div class="footer-controls">
-        <button onclick="changeLvl(-1)">PRÉCÉDENT</button>
-        <button class="btn-primary" id="play-btn" onclick="toggleTimer()" style="min-width: 140px;">DÉMARRER</button>
-        <button onclick="changeLvl(1)">SUIVANT</button>
+    <div class="mobile-tabs">
+        <button class="tab-btn" id="tab0" onclick="showPanel(0)">Joueurs</button>
+        <button class="tab-btn active" id="tab1" onclick="showPanel(1)">Chrono</button>
+        <button class="tab-btn" id="tab2" onclick="showPanel(2)">Prix</button>
     </div>
 
-    <!-- MODAL RÉGLAGES -->
+    <div class="controls">
+        <button onclick="changeLvl(-1)">←</button>
+        <button class="btn-main" id="play-btn" onclick="toggleTimer()">DÉMARRER</button>
+        <button onclick="changeLvl(1)">→</button>
+    </div>
+
+    <!-- SETTINGS MODAL -->
     <div id="modal" class="modal">
         <div class="modal-content">
-            <div>
-                <label class="list-header">Configuration</label>
-                <input type="text" id="in-name" placeholder="Nom du tournoi">
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px">
-                    <input type="number" id="in-buy" placeholder="Buy-in €">
-                    <select id="in-paid-select" onchange="toggleCustomPaid()">
-                        <option value="auto">Payés: Auto</option>
-                        <option value="1">Top 1</option>
-                        <option value="2">Top 2</option>
-                        <option value="3">Top 3</option>
-                        <option value="custom">Personnalisé...</option>
-                    </select>
-                </div>
-                <input type="number" id="in-paid-custom" style="display:none" placeholder="Nb de places payées">
-                
-                <label class="list-header" style="margin-top:20px">Structure (Blinds ou PAUSE10)</label>
-                <textarea id="in-blinds" rows="12">25/50
-50/100
-75/150
-100/200
-100/200/200
-200/400/200/PAUSE10
-300/600/300
-400/800/400
-500/1000/500
-600/1200/600
-800/1600/800
-1000/2000/1000
-1500/3000/1500
-2000/4000/2000
-3000/6000/3000
-5000/10000/5000</textarea>
-            </div>
-            <div>
-                <label class="list-header">Joueurs</label>
-                <div style="display:flex; gap:5px; margin-bottom:10px">
-                    <button onclick="setMode('qty')" id="m-qty" style="flex:1">Quantité</button>
-                    <button onclick="setMode('list')" id="m-list" style="flex:1">Liste Noms</button>
-                </div>
-                <div id="box-qty"><input type="number" id="in-qty" value="10"></div>
-                <div id="box-list" style="display:none"><textarea id="in-players" rows="5" placeholder="Noms séparés par entrée..."></textarea></div>
-
-                <label class="list-header" style="margin-top:20px">Temps/Niveau (min)</label>
-                <input type="number" id="in-dur" value="15">
-
-                <button class="btn-primary" onclick="applySettings()" style="width:100%; margin-top:30px; padding:15px">APPLIQUER LES RÉGLAGES</button>
-                <button onclick="closeSettings()" style="width:100%; margin-top:10px; background:none">RETOUR</button>
-                <button onclick="resetApp()" style="width:100%; margin-top:10px; color: #ff3b30; font-size: 11px;">RÉINITIALISER TOUT</button>
-            </div>
+            <h2 style="margin-top:0">Config</h2>
+            <input type="text" id="in-name" placeholder="Nom">
+            <input type="number" id="in-buy" placeholder="Buy-in €">
+            <input type="number" id="in-dur" placeholder="Minutes par niveau">
+            <label class="list-header">Structure</label>
+            <textarea id="in-blinds" rows="8"></textarea>
+            <label class="list-header">Joueurs (un par ligne)</label>
+            <textarea id="in-players" rows="5"></textarea>
+            <button class="btn-main" onclick="applySettings()" style="width:100%; margin-top:15px">APPLIQUER</button>
+            <button onclick="closeSettings()" style="width:100%; margin-top:10px; background:none">Annuler</button>
         </div>
     </div>
 
     <script>
         let state = {
             theme: 'dark', name: 'NUTZ POKER PRO', buyin: 20, duration: 15, level: 0,
-            timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaid: 3,
-            players: [], structure: [], isPause: false
+            timeLeft: 900, playing: false, players: [], 
+            structure: ["25/50","50/100","75/150","100/200","100/200/200","200/400/200","300/600/300","400/800/400","500/1000/500","600/1200/600","800/1600/800","1000/2000/1000","1500/3000/1500","2000/4000/2000","3000/6000/3000","5000/10000/5000"]
         };
         let clock = null;
+
+        function showPanel(idx) {
+            document.getElementById('panel-players').classList.toggle('active', idx === 0);
+            document.getElementById('panel-payouts').classList.toggle('active', idx === 2);
+            document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+        }
 
         function toggleTheme() {
             state.theme = state.theme === 'dark' ? 'light' : 'dark';
@@ -230,117 +222,50 @@
 
         function toggleFS() {
             if (!document.fullscreenElement) document.documentElement.requestFullscreen();
-            else if (document.exitFullscreen) document.exitFullscreen();
-        }
-
-        function toggleCustomPaid() {
-            document.getElementById('in-paid-custom').style.display = 
-                (document.getElementById('in-paid-select').value === 'custom') ? 'block' : 'none';
-        }
-
-        function setMode(m) {
-            state.mode = m;
-            document.getElementById('m-qty').style.backgroundColor = m==='qty'?'var(--accent)':'var(--btn)';
-            document.getElementById('m-qty').style.color = m==='qty'?'var(--bg)':'var(--accent)';
-            document.getElementById('m-list').style.backgroundColor = m==='list'?'var(--accent)':'var(--btn)';
-            document.getElementById('m-list').style.color = m==='list'?'var(--bg)':'var(--accent)';
-            document.getElementById('box-qty').style.display = m==='qty'?'block':'none';
-            document.getElementById('box-list').style.display = m==='list'?'block':'none';
+            else document.exitFullscreen();
         }
 
         function applySettings() {
-            state.name = document.getElementById('in-name').value || "NUTZ POKER PRO";
+            state.name = document.getElementById('in-name').value || "POKER";
             state.buyin = parseInt(document.getElementById('in-buy').value) || 0;
             state.duration = parseInt(document.getElementById('in-dur').value) || 15;
-            state.paidMode = document.getElementById('in-paid-select').value;
-            state.customPaid = parseInt(document.getElementById('in-paid-custom').value) || 3;
             state.structure = document.getElementById('in-blinds').value.split('\n').filter(l => l.trim());
             
-            if (state.mode === 'qty') {
-                let count = parseInt(document.getElementById('in-qty').value) || 0;
-                state.players = Array.from({length: count}, (_, i) => ({ name: `Joueur ${i+1}`, out: false, rank: null }));
-            } else {
-                state.players = document.getElementById('in-players').value.split(/[\n,;]+/).map(n => ({name: n.trim(), out: false, rank: null})).filter(p => p.name);
-            }
-
-            state.level = 0; 
-            state.timeLeft = state.duration * 60; 
-            state.playing = false;
-            clearInterval(clock); 
-            save(); 
-            render(); 
-            closeSettings();
-        }
-
-        function getPayouts() {
-            const pot = state.players.length * state.buyin;
-            let nPaid = 3;
-            if(state.paidMode === 'auto') {
-                const n = state.players.length;
-                if(n > 40) nPaid = 10; else if(n > 20) nPaid = 7; else if(n > 10) nPaid = 5; else nPaid = 3;
-            } else {
-                nPaid = state.paidMode === 'custom' ? state.customPaid : parseInt(state.paidMode);
-            }
-
-            if(pot <= 0) return [];
-            let pay = [];
-            let first = Math.round((pot * 0.50) / 5) * 5;
-            pay.push({ label: '1er', val: first });
-            if(nPaid > 1) {
-                let rem = pot - first;
-                let totalS = (nPaid * (nPaid - 1)) / 2;
-                for(let i = 2; i <= nPaid; i++) {
-                    let val = Math.round((rem * (nPaid - i + 1) / totalS) / 5) * 5;
-                    pay.push({ label: `${i}e`, val: val });
-                }
-            }
-            let diff = pot - pay.reduce((a,b) => a+b.val, 0);
-            if(pay.length > 0) pay[pay.length-1].val += diff;
-            return pay.filter(p => p.val > 0);
+            const names = document.getElementById('in-players').value.split('\n').filter(n => n.trim());
+            state.players = names.map(n => ({name: n, out: false, rank: null}));
+            
+            state.level = 0; state.timeLeft = state.duration * 60;
+            save(); render(); closeSettings();
         }
 
         function render() {
             document.body.setAttribute('data-theme', state.theme);
-            document.getElementById('ui-tourney-name').innerText = state.name.toUpperCase();
+            document.getElementById('ui-tourney-name').innerText = state.name;
             
             const m = Math.floor(state.timeLeft / 60);
             const s = state.timeLeft % 60;
             document.getElementById('timer').innerText = `${m}:${s < 10 ? '0'+s : s}`;
             
-            const line = state.structure[state.level] || "FIN";
-            document.getElementById('ui-blinds').innerText = state.isPause ? "PAUSE" : line.split('/PAUSE')[0];
-            document.getElementById('ui-level-num').innerText = `Niveau ${state.level + 1}`;
-            
-            let nextStr = state.structure[state.level + 1] || "FIN";
-            document.getElementById('ui-next').innerText = "Suivant: " + nextStr.split('/PAUSE')[0];
-            document.getElementById('ui-pause-notif').style.display = state.isPause ? "block" : "none";
+            document.getElementById('ui-blinds').innerText = state.structure[state.level] || "FIN";
+            document.getElementById('ui-level-num').innerText = `NIVEAU ${state.level + 1}`;
+            document.getElementById('ui-next').innerText = "Suivant: " + (state.structure[state.level+1] || "FIN");
 
-            const listUI = document.getElementById('ui-player-list');
-            listUI.innerHTML = "";
-            let sorted = [...state.players].sort((a,b) => (a.out === b.out) ? 0 : a.out ? 1 : -1);
-
-            sorted.forEach((p) => {
-                const idx = state.players.indexOf(p);
-                listUI.innerHTML += `
-                    <div class="row ${p.out ? 'out' : ''}" onclick="toggleOut(${idx})">
+            const playerUI = document.getElementById('ui-player-list');
+            playerUI.innerHTML = "";
+            [...state.players].sort((a,b) => a.out - b.out).forEach((p, i) => {
+                const realIdx = state.players.indexOf(p);
+                playerUI.innerHTML += `
+                    <div class="row ${p.out ? 'out' : ''}" onclick="toggleOut(${realIdx})">
                         <span>${p.name} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span>
-                        <span>${p.out ? 'OUT' : 'ALIVE'}</span>
+                        <span>${p.out ? 'ELIMINÉ' : 'EN JEU'}</span>
                     </div>`;
             });
 
             document.getElementById('ui-count').innerText = state.players.filter(p => !p.out).length + '/' + state.players.length;
             document.getElementById('ui-total-pot').innerText = state.players.length * state.buyin;
             
-            const payUI = document.getElementById('ui-payouts');
-            payUI.innerHTML = "";
-            getPayouts().forEach(p => payUI.innerHTML += `<div class="row" style="cursor:default"><span>${p.label}</span><span>${p.val}€</span></div>`);
-            
             document.getElementById('play-btn').innerText = state.playing ? "PAUSE" : "DÉMARRER";
-            
-            const thIcon = document.getElementById('theme-icon');
-            thIcon.innerHTML = state.theme === 'dark' ? 
-                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' :
-                '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+            document.getElementById('theme-icon').innerHTML = state.theme === 'dark' ? '🌙' : '☀️';
         }
 
         function toggleTimer() {
@@ -349,58 +274,44 @@
                 state.playing = true;
                 clock = setInterval(() => {
                     state.timeLeft--;
-                    if(state.timeLeft < 0) handleLevelEnd();
+                    if(state.timeLeft < 0) {
+                        state.level++; state.timeLeft = state.duration * 60;
+                        if(state.level >= state.structure.length) { clearInterval(clock); state.playing = false; }
+                    }
                     render();
                 }, 1000);
             }
             render();
         }
 
-        function handleLevelEnd() {
-            const line = state.structure[state.level] || "";
-            if(!state.isPause && line.toUpperCase().includes("PAUSE")) {
-                state.isPause = true;
-                state.timeLeft = (parseInt(line.toUpperCase().split("PAUSE")[1]) || 5) * 60;
-            } else {
-                state.isPause = false;
-                state.level++;
-                state.timeLeft = state.duration * 60;
-                if(state.level >= state.structure.length) { clearInterval(clock); state.playing = false; }
-            }
-        }
-
         function changeLvl(dir) {
             state.level = Math.max(0, Math.min(state.structure.length - 1, state.level + dir));
-            state.isPause = false; state.timeLeft = state.duration * 60; render();
+            state.timeLeft = state.duration * 60; render();
         }
 
         function toggleOut(i) {
             const p = state.players[i];
             if(!p.out) {
-                const alive = state.players.filter(x => !x.out).length;
-                p.out = true; p.rank = alive;
-                if(alive === 2) confetti();
+                p.out = true; p.rank = state.players.filter(x => !x.out).length + 1;
+                if(state.players.filter(x => !x.out).length === 1) confetti();
             } else { p.out = false; p.rank = null; }
             save(); render();
         }
 
-        function resetApp() { if(confirm("Supprimer toutes les données ?")) { localStorage.removeItem('nutz_pro_v6'); location.reload(); } }
-        function openSettings() { document.getElementById('modal').style.display = 'flex'; }
+        function openSettings() { 
+            document.getElementById('modal').style.display = 'flex';
+            document.getElementById('in-name').value = state.name;
+            document.getElementById('in-buy').value = state.buyin;
+            document.getElementById('in-dur').value = state.duration;
+            document.getElementById('in-blinds').value = state.structure.join('\n');
+            document.getElementById('in-players').value = state.players.map(p => p.name).join('\n');
+        }
         function closeSettings() { document.getElementById('modal').style.display = 'none'; }
-        function save() { localStorage.setItem('nutz_pro_v6', JSON.stringify(state)); }
+        function save() { localStorage.setItem('nutz_poker_v7', JSON.stringify(state)); }
 
         window.onload = () => {
-            const saved = localStorage.getItem('nutz_pro_v6');
-            if(saved) {
-                state = JSON.parse(saved);
-                state.playing = false;
-                document.getElementById('in-name').value = state.name;
-                document.getElementById('in-buy').value = state.buyin;
-                document.getElementById('in-dur').value = state.duration;
-                document.getElementById('in-blinds').value = state.structure.join('\n');
-            } else {
-                applySettings(); // Initialize default
-            }
+            const saved = localStorage.getItem('nutz_poker_v7');
+            if(saved) state = JSON.parse(saved);
             render();
         };
     </script>
