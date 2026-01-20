@@ -5,243 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Nutz Poker Timer</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <style>
-        :root {
-            --bg: #000000;
-            --card: #1c1c1e;
-            --accent: #ffffff;
-            --secondary: #86868b;
-            --border: #2c2c2e;
-            --btn: #2c2c2e;
-            --input-bg: #101010;
-            --danger: #ff453a;
-            --success: #30d158;
-            --font: "-apple-system", "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            --nav-height: 50px;
-            --footer-height: 80px;
-            --tab-height: 50px;
-        }
-
-        [data-theme="light"] {
-            --bg: #f2f2f7;
-            --card: #ffffff;
-            --accent: #000000;
-            --secondary: #86868b;
-            --border: #d1d1d6;
-            --btn: #e5e5ea;
-            --input-bg: #f0f0f5;
-            --danger: #ff3b30;
-        }
-
-        * { box-sizing: border-box; }
-
-        body {
-            background-color: var(--bg);
-            color: var(--accent);
-            font-family: var(--font);
-            margin: 0;
-            height: 100vh;
-            display: flex;
-            flex-direction: column;
-            overflow: hidden;
-            transition: background 0.1s ease;
-        }
-
-        /* HEADER */
-        .nav {
-            height: var(--nav-height);
-            padding: 0 15px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 1px solid var(--border);
-            background: var(--bg);
-            z-index: 10;
-        }
-
-        .nav h1 { font-size: 1rem; font-weight: 700; margin: 0; letter-spacing: -0.5px; }
-        .nav-right { display: flex; gap: 8px; align-items: center; }
-
-        .icon-btn { 
-            background: none; border: none; cursor: pointer; padding: 6px; 
-            display: flex; align-items: center; justify-content: center;
-            color: var(--accent); opacity: 0.8; transition: 0.2s; border-radius: 50%;
-            text-decoration: none; 
-        }
-        .icon-btn:hover { opacity: 1; background: var(--border); }
-        .icon-btn svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-
-        /* ONGLETS MOBILE */
-        .mobile-tabs {
-            display: none;
-            height: var(--tab-height);
-            background: var(--bg);
-            border-bottom: 1px solid var(--border);
-            justify-content: space-around;
-            align-items: center;
-        }
-        .tab-btn {
-            background: none; border: none; color: var(--secondary);
-            font-size: 12px; font-weight: 600; text-transform: uppercase;
-            padding: 0; height: 100%; flex: 1; cursor: pointer;
-            border-bottom: 2px solid transparent;
-        }
-        .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
-
-        /* MAIN LAYOUT */
-        .main-container {
-            flex: 1;
-            display: grid;
-            grid-template-columns: 300px 1fr 300px;
-            overflow: hidden; 
-            position: relative;
-        }
-
-        .view-section {
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-            padding: 20px;
-        }
-        .view-left { border-right: 1px solid var(--border); }
-        .view-right { border-left: 1px solid var(--border); }
-        .view-center { 
-            display: flex; flex-direction: column; 
-            justify-content: center; align-items: center; text-align: center; 
-        }
-
-        /* CONTENU VUES */
-        #timer { 
-            font-size: clamp(4rem, 12vw, 10rem); font-weight: 700; letter-spacing: -2px; 
-            font-variant-numeric: tabular-nums; line-height: 1; margin: 10px 0;
-        }
-        .blinds-display { font-size: clamp(2rem, 6vw, 5.5rem); font-weight: 600; margin: 10px 0; line-height: 1.1; }
-        .level-tag { color: var(--secondary); text-transform: uppercase; font-size: 0.9rem; font-weight: 700; letter-spacing: 2px; }
-
-        .list-header { 
-            font-size: 11px; color: var(--secondary); font-weight: 700; text-transform: uppercase; 
-            margin-bottom: 10px; display: block; position: sticky; top: 0; background: var(--bg); padding: 10px 0; z-index: 5;
-        }
-        .row { display: flex; justify-content: space-between; padding: 12px 10px; border-bottom: 1px solid var(--border); font-size: 14px; margin-bottom: 2px; cursor: pointer; border-radius: 6px; }
-        .row:hover { background: var(--card); }
-        .row.out { color: var(--secondary); opacity: 0.6; text-decoration: line-through; }
-        .rank-tag { font-size: 10px; background: var(--btn); padding: 2px 6px; border-radius: 4px; margin-left: 8px; font-weight: bold; color: var(--accent); }
-
-        /* FOOTER */
-        .footer-controls { 
-            height: var(--footer-height);
-            padding: 0 15px; 
-            display: flex; justify-content: center; align-items: center; gap: 15px; 
-            border-top: 1px solid var(--border); background: var(--bg);
-            z-index: 20;
-        }
-        .btn-ctrl { 
-            background: var(--btn); color: var(--accent); border: none; 
-            border-radius: 50%; width: 50px; height: 50px; 
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer; transition: transform 0.1s;
-        }
-        .btn-ctrl:active { transform: scale(0.9); }
-        .btn-ctrl svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 2; fill: none; }
-
-        .btn-primary { 
-            background: var(--accent); color: var(--bg); border: none;
-            padding: 0 30px; height: 50px; border-radius: 25px; 
-            font-size: 16px; font-weight: 700; cursor: pointer; min-width: 140px;
-            display: flex; align-items: center; justify-content: center;
-        }
-        .btn-primary:active { opacity: 0.8; transform: scale(0.98); }
-
-        /* ================= MODAL REGLAGES ================= */
-        .modal { 
-            position: fixed; inset: 0; background: rgba(0,0,0,0.85); 
-            display: none; justify-content: center; align-items: center; 
-            z-index: 100; backdrop-filter: blur(10px); padding: 15px; 
-        }
-
-        .modal-content { 
-            width: 100%; max-width: 900px; 
-            background: var(--card); 
-            border-radius: 18px; 
-            border: 1px solid var(--border);
-            max-height: 90vh; 
-            display: flex; flex-direction: column;
-            overflow: hidden;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
-
-        .modal-body {
-            padding: 25px;
-            overflow-y: auto;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 30px;
-        }
-
-        .modal-section-title {
-            font-size: 12px; font-weight: 700; color: var(--secondary); text-transform: uppercase; margin-bottom: 10px; display: block;
-        }
-
-        .input-group { margin-bottom: 15px; }
-
-        textarea, input, select { 
-            width: 100%; 
-            background: var(--input-bg); 
-            border: 1px solid transparent; 
-            border-radius: 8px; 
-            color: var(--accent); 
-            padding: 12px; 
-            font-size: 15px; 
-            outline: none; 
-            font-family: var(--font);
-            transition: border-color 0.2s;
-        }
-        textarea:focus, input:focus, select:focus { border-color: var(--secondary); }
-        select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23888%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E"); background-repeat: no-repeat; background-position: right 12px top 50%; background-size: 10px auto; }
-        textarea { resize: vertical; min-height: 120px; line-height: 1.4; }
-
-        .toggle-container {
-            background: var(--input-bg); padding: 4px; border-radius: 10px;
-            display: flex; gap: 4px; margin-bottom: 10px;
-        }
-        .toggle-btn {
-            flex: 1; padding: 8px; border-radius: 7px;
-            border: none; background: transparent; 
-            color: var(--secondary); font-weight: 600; font-size: 13px;
-            cursor: pointer; transition: 0.2s ease;
-        }
-        .toggle-btn.active {
-            background: var(--border); color: var(--accent);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-
-        .switch-group { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
-        .switch { position: relative; display: inline-block; width: 44px; height: 24px; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--btn); transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 20px; width: 20px; left: 2px; bottom: 2px; background-color: var(--accent); transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
-        input:checked + .slider { background-color: var(--success); }
-        input:checked + .slider:before { transform: translateX(20px); background-color: white; }
-
-        .modal-footer {
-            padding: 15px 25px;
-            border-top: 1px solid var(--border);
-            display: flex; gap: 10px;
-            background: var(--card);
-        }
-        .modal-btn-confirm { flex: 2; background: var(--accent); color: var(--bg); font-weight: 700; height: 44px; border-radius: 8px; border:none; cursor: pointer; }
-        .modal-btn-cancel { flex: 1; background: var(--btn); color: var(--accent); height: 44px; border-radius: 8px; border:none; cursor: pointer; font-weight: 600; }
-        .modal-btn-danger { flex: 0.5; background: transparent; color: var(--danger); border: 1px solid var(--border); height: 44px; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 12px; }
-
-        @media (max-width: 1024px) {
-            .mobile-tabs { display: flex; }
-            .main-container { display: block; }
-            .view-section { display: none; height: 100%; width: 100%; border: none; padding-bottom: 100px; }
-            .view-section.active-mobile { display: flex; flex-direction: column; animation: fadeIn 0.2s; }
-            .modal-content { height: 100%; max-height: 100%; border-radius: 0; border: none; }
-            .modal-body { grid-template-columns: 1fr; padding: 20px; }
-        }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="dark">
 
@@ -298,6 +62,25 @@
         </button>
     </div>
 
+    <!-- WINNER OVERLAY -->
+    <div id="winner-overlay" class="winner-overlay">
+        <div class="winner-content">
+            <div class="winner-trophy">🏆</div>
+            <div class="winner-title">Gagnant</div>
+            <div class="winner-name" id="winner-name">CHAMPION</div>
+        </div>
+        <div class="winner-tap-hint">Touchez l'écran pour continuer</div>
+    </div>
+
+    <!-- PLAYER CONTEXT MENU -->
+    <div id="player-context-menu" class="player-context-menu"></div>
+
+    <!-- TOAST NOTIFICATION -->
+    <div id="toast-notification" class="toast-notification">
+        <div class="toast-title" id="toast-title"></div>
+        <div class="toast-content" id="toast-content"></div>
+    </div>
+
     <!-- MODAL REGLAGES -->
     <div id="modal" class="modal">
         <div class="modal-content">
@@ -305,18 +88,33 @@
                 <div>
                     <span class="modal-section-title">Général</span>
                     <div class="input-group">
-                        <input type="text" id="in-name" placeholder="Nom du tournoi">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Nom du tournoi</label>
+                        <input type="text" id="in-name" placeholder="">
                     </div>
                     <div class="input-group">
-                        <input type="number" id="in-buy" placeholder="Buy-in (€)">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Buy-in (€)</label>
+                        <input type="number" id="in-buy" placeholder="">
+                    </div>
+                    <div class="input-group">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Prix Rebuy/Add-on (€)</label>
+                        <input type="number" id="in-rebuy" placeholder="">
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Si vide, même prix que le buy-in</p>
                     </div>
                     <div class="input-group">
                         <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Durée des niveaux (min)</label>
                         <input type="number" id="in-dur" value="15">
                     </div>
 
+                    <span class="modal-section-title" style="margin-top:20px;">Multi-Tables</span>
+                    <div class="input-group">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Places par table</label>
+                        <input type="number" id="in-table-size" placeholder="">
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Ex: 9 pour des tables de 9 joueurs max. 0 ou vide = une seule table.</p>
+                    </div>
+
                     <span class="modal-section-title" style="margin-top:20px;">Répartition des Prix</span>
                     <div class="input-group">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Mode de paiement</label>
                         <select id="in-paid-select" onchange="toggleCustomPaid()">
                             <option value="auto">Auto (10-15% du field)</option>
                             <option value="1">Winner Takes All</option>
@@ -324,7 +122,7 @@
                             <option value="3">Top 3 (Clasico)</option>
                             <option value="custom">Répartition perso...</option>
                         </select>
-                        <input type="text" id="in-paid-custom-str" style="display:none; margin-top:5px;" placeholder="Ex: 50/30/20 ou 25/10/5">
+                        <input type="text" id="in-paid-custom-str" style="display:none; margin-top:5px;" placeholder="">
                         <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Entrez soit des pourcentages (ex: 50/30/20) soit les montants exacts (ex: 25/10/5).</p>
                     </div>
                 </div>
@@ -337,10 +135,12 @@
                     </div>
 
                     <div id="box-qty">
-                        <input type="number" id="in-qty" value="10" placeholder="Nombre de joueurs">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Nombre de joueurs</label>
+                        <input type="number" id="in-qty" value="10" placeholder="">
                     </div>
                     <div id="box-list" style="display:none">
-                        <textarea id="in-players" rows="5" placeholder="Un nom par ligne..."></textarea>
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Liste des noms</label>
+                        <textarea id="in-players" rows="5" placeholder=""></textarea>
                     </div>
 
                     <div class="switch-group" style="margin-top:20px;">
@@ -354,17 +154,22 @@
                         </div>
                     </div>
                     <textarea id="in-blinds" rows="8" style="font-family:monospace; font-size:13px; margin-top:5px;">25/50
+25/50
 50/100
-75/150/PAUSE5
+75/150
 100/200
-200/400/PAUSE5
-300/600
-400/800
-500/1000/PAUSE5
-600/1200
-800/1600
-1000/2000
-1500/3000</textarea>
+100/200/200
+200/400/200
+300/600/300
+400/800/400
+500/1000/500
+600/1200/600
+800/1600/800
+1000/2000/1000
+1500/3000/1500
+2000/4000/2000
+3000/6000/3000
+5000/10000/5000</textarea>
                 </div>
             </div>
 
@@ -376,303 +181,6 @@
         </div>
     </div>
 
-    <script>
-        // --- NAVIGATION MOBILE ---
-        function openTab(tabName, btn) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-mobile'));
-            document.getElementById('tab-' + tabName).classList.add('active-mobile');
-            if(btn) { document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
-        }
-
-        // --- STATE & AUDIO ---
-        let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false };
-        let clock = null;
-        
-        // SON AMONG US
-        const alarmSound = new Audio("https://www.myinstants.com/media/sounds/among.mp3");
-
-        function unlockAudio() {
-            alarmSound.play().then(() => {
-                alarmSound.pause();
-                alarmSound.currentTime = 0;
-            }).catch(() => {}); 
-        }
-
-        function playTone() {
-            if(state.muted) return;
-            alarmSound.currentTime = 0;
-            alarmSound.play().catch(e => console.log("Audio blocked", e));
-        }
-
-        function toggleTheme() { state.theme = state.theme === 'dark' ? 'light' : 'dark'; render(); }
-        function toggleFS() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen(); }
-        function toggleMute() { state.muted = !state.muted; render(); }
-        
-        function triggerAlert() {
-            playTone();
-            let count = 0;
-            const originalTheme = state.theme;
-            const flash = setInterval(() => {
-                const current = document.body.getAttribute('data-theme');
-                document.body.setAttribute('data-theme', current === 'dark' ? 'light' : 'dark');
-                count++;
-                if(count > 5) { clearInterval(flash); document.body.setAttribute('data-theme', originalTheme); }
-            }, 150);
-        }
-
-        function toggleCustomPaid() {
-            const isCustom = document.getElementById('in-paid-select').value === 'custom';
-            document.getElementById('in-paid-custom-str').style.display = isCustom ? 'block' : 'none';
-        }
-        
-        function setMode(m) {
-            state.mode = m;
-            document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
-            if(m === 'qty') document.getElementById('btn-mode-qty').classList.add('active');
-            else document.getElementById('btn-mode-list').classList.add('active');
-            document.getElementById('box-qty').style.display = m==='qty'?'block':'none';
-            document.getElementById('box-list').style.display = m==='list'?'block':'none';
-        }
-
-        function toggleAntesStruct() {
-            const chk = document.getElementById('in-antes-toggle');
-            const txt = document.getElementById('in-blinds');
-            let lines = txt.value.split('\n');
-            const newLines = lines.map(line => {
-                let cleanLine = line.trim();
-                if(!cleanLine) return "";
-                let pausePart = "";
-                let blindsPart = cleanLine;
-                const pIdx = cleanLine.toUpperCase().indexOf('PAUSE');
-                if(pIdx !== -1) {
-                    blindsPart = cleanLine.substring(0, pIdx);
-                    if(blindsPart.endsWith('/')) blindsPart = blindsPart.slice(0, -1);
-                    pausePart = cleanLine.substring(pIdx);
-                }
-                let parts = blindsPart.split('/');
-                if(parts.length >= 2) {
-                    const sb = parts[0];
-                    const bb = parts[1];
-                    parts = chk.checked ? [sb, bb, bb] : [sb, bb];
-                    blindsPart = parts.join('/');
-                }
-                if(blindsPart && pausePart) return blindsPart + "/" + pausePart;
-                if(pausePart) return pausePart;
-                return blindsPart;
-            });
-            txt.value = newLines.join('\n');
-        }
-
-        function applySettings() {
-            state.name = document.getElementById('in-name').value || "NUTZ POKER";
-            state.buyin = parseInt(document.getElementById('in-buy').value) || 0;
-            state.duration = parseInt(document.getElementById('in-dur').value) || 15;
-            state.paidMode = document.getElementById('in-paid-select').value;
-            state.customPaidStr = document.getElementById('in-paid-custom-str').value;
-            state.structure = document.getElementById('in-blinds').value.split('\n').filter(l => l.trim());
-            
-            if (state.mode === 'qty') {
-                let count = parseInt(document.getElementById('in-qty').value) || 0;
-                if(state.players.length !== count) {
-                     state.players = Array.from({length: count}, (_, i) => ({ name: `Joueur ${i+1}`, out: false, rank: null }));
-                }
-            } else {
-                state.players = document.getElementById('in-players').value.split(/[\n,;]+/).map(n => ({name: n.trim(), out: false, rank: null})).filter(p => p.name);
-            }
-            
-            state.timeLeft = state.duration * 60; 
-            state.playing = false;
-            clearInterval(clock); 
-            save(); render(); closeSettings();
-        }
-
-        function getPayouts() {
-            const pot = state.players.length * state.buyin;
-            if(pot <= 0) return [];
-            
-            let weights = [];
-            
-            if(state.paidMode === 'custom') {
-                // Parse format "50/30/20" ou "25/10/5"
-                weights = state.customPaidStr.split(/\/|;|\,| /).map(s => parseFloat(s)).filter(n => !isNaN(n) && n > 0);
-                if(weights.length === 0) weights = [1];
-            } else {
-                let nPaid;
-                if(state.paidMode === 'auto') {
-                    const n = state.players.length;
-                    nPaid = n>40?10 : n>20?7 : n>10?5 : n>5?3 : 2; 
-                } else {
-                    nPaid = parseInt(state.paidMode);
-                }
-                if(nPaid > state.players.length) nPaid = state.players.length;
-                
-                if(nPaid === 1) weights = [100];
-                else if(nPaid === 2) weights = [65, 35];
-                else if(nPaid === 3) weights = [50, 30, 20];
-                else if(nPaid === 4) weights = [45, 25, 20, 10];
-                else {
-                    for(let i=0; i<nPaid; i++) weights.push(100/Math.pow(1.5, i));
-                }
-            }
-            
-            const totalWeight = weights.reduce((a,b) => a+b, 0);
-            
-            // Si le pot est petit (<100€), on arrondit à 1€ près. Sinon à 5€.
-            let step = (pot < 100) ? 1 : 5;
-            
-            let rawPayouts = weights.map(w => (w / totalWeight) * pot);
-            let payouts = rawPayouts.map(r => Math.max(step, Math.round(r / step) * step));
-            
-            let currentSum = payouts.reduce((a,b) => a+b, 0);
-            let diff = pot - currentSum;
-
-            // Ajustement pour correspondre pile au pot
-            if(diff !== 0) {
-                if(diff > 0) payouts[0] += diff; // On ajoute le reste au 1er
-                else {
-                    // On retire le trop perçu au dernier, puis avant-dernier, etc.
-                    let idx = payouts.length - 1;
-                    while(diff < 0) {
-                         payouts[idx] -= step;
-                         diff += step;
-                         if(payouts[idx] < step) { payouts[idx] = step; diff -= step; idx--; if(idx<0) idx=0; } // Safety
-                    }
-                }
-            }
-
-            // Lissage final : s'assurer que P(n) >= P(n+1)
-            for(let i=0; i<payouts.length-1; i++) {
-                if(payouts[i] < payouts[i+1]) {
-                    // Si le 2e gagne plus que le 1er (rare mais possible avec arrondi), on swap
-                    let total = payouts[i] + payouts[i+1];
-                    payouts[i] = Math.ceil(total/2/step)*step;
-                    payouts[i+1] = total - payouts[i];
-                }
-            }
-
-            return payouts.map((val, i) => ({ label: (i+1) + (i===0?'er':'e'), val: val })).filter(p => p.val > 0);
-        }
-
-        function render() {
-            document.body.setAttribute('data-theme', state.theme);
-            document.getElementById('ui-tourney-name').innerText = state.name.toUpperCase();
-            
-            const m = Math.floor(state.timeLeft / 60); const s = state.timeLeft % 60;
-            document.getElementById('timer').innerText = `${m}:${s < 10 ? '0'+s : s}`;
-            
-            const line = state.structure[state.level] || "FIN";
-            
-            let blindsText = "PAUSE";
-            if(!state.isPause) {
-                let parts = line.split('/');
-                parts = parts.filter(p => !p.toUpperCase().includes('PAUSE'));
-                if(parts.length === 3) blindsText = `${parts[0]} / ${parts[1]} (${parts[2]})`;
-                else blindsText = parts.join(' / ');
-            }
-            document.getElementById('ui-blinds').innerText = blindsText;
-            document.getElementById('ui-level-num').innerText = `Niveau ${state.level + 1}`;
-            
-            const nextL = state.structure[state.level + 1];
-            let nextText = "—";
-            if(nextL) {
-                if(nextL.toUpperCase().includes("PAUSE")) nextText = "PAUSE";
-                else {
-                    let np = nextL.split('/');
-                    np = np.filter(p => !p.toUpperCase().includes('PAUSE'));
-                    nextText = np.length===3 ? `${np[0]}/${np[1]}(${np[2]})` : np.join('/');
-                }
-            }
-            document.getElementById('ui-next').innerText = "Suivant: " + nextText;
-            document.getElementById('ui-pause-notif').style.display = state.isPause ? "block" : "none";
-
-            const listUI = document.getElementById('ui-player-list'); listUI.innerHTML = "";
-            [...state.players].sort((a,b) => (a.out === b.out) ? 0 : a.out ? 1 : -1).forEach((p) => {
-                const idx = state.players.indexOf(p);
-                listUI.innerHTML += `<div class="row ${p.out ? 'out' : ''}" onclick="toggleOut(${idx})"><span>${p.name} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span><span>${p.out ? 'OUT' : ''}</span></div>`;
-            });
-            document.getElementById('ui-count').innerText = state.players.filter(p => !p.out).length + '/' + state.players.length;
-            document.getElementById('ui-total-pot').innerText = state.players.length * state.buyin;
-            
-            const payUI = document.getElementById('ui-payouts'); payUI.innerHTML = "";
-            getPayouts().forEach(p => payUI.innerHTML += `<div class="row" style="cursor:default"><span>${p.label}</span><span>${p.val}€</span></div>`);
-            
-            const playBtn = document.getElementById('play-btn');
-            playBtn.innerText = state.playing ? "PAUSE" : "DÉMARRER";
-            playBtn.style.background = state.playing ? "var(--btn)" : "var(--accent)";
-            playBtn.style.color = state.playing ? "var(--accent)" : "var(--bg)";
-            
-            document.getElementById('theme-icon').innerHTML = state.theme === 'dark' ? 
-                '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' :
-                '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
-            
-            const muteIcon = document.getElementById('mute-icon');
-            if (state.muted) {
-                muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
-                muteIcon.style.opacity = "0.5";
-            } else {
-                muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
-                muteIcon.style.opacity = "1";
-            }
-        }
-
-        function toggleTimer() {
-            unlockAudio(); 
-            if(state.playing) { clearInterval(clock); state.playing = false; }
-            else { state.playing = true; clock = setInterval(() => { state.timeLeft--; if(state.timeLeft < 0) handleLevelEnd(); render(); }, 1000); }
-            render();
-        }
-
-        function handleLevelEnd() {
-            triggerAlert();
-            const line = state.structure[state.level] || "";
-            if(!state.isPause && line.toUpperCase().includes("PAUSE")) {
-                state.isPause = true; state.timeLeft = (parseInt(line.toUpperCase().split("PAUSE")[1]) || 5) * 60;
-            } else {
-                state.isPause = false; state.level++; state.timeLeft = state.duration * 60;
-                if(state.level >= state.structure.length) { clearInterval(clock); state.playing = false; }
-            }
-        }
-        function changeLvl(dir) { 
-            unlockAudio(); 
-            state.level = Math.max(0, Math.min(state.structure.length - 1, state.level + dir)); 
-            if(dir > 0) triggerAlert(); 
-            state.isPause = false; state.timeLeft = state.duration * 60; render(); 
-        }
-        function toggleOut(i) { const p = state.players[i]; if(!p.out) { const alive = state.players.filter(x => !x.out).length; p.out = true; p.rank = alive; if(alive === 2) confetti(); } else { p.out = false; p.rank = null; } save(); render(); }
-        function resetApp() { if(confirm("Supprimer toutes les données et recommencer ?")) { localStorage.removeItem('nutz_pro_v6'); location.reload(); } }
-        
-        function openSettings() { 
-            unlockAudio();
-            document.getElementById('in-name').value = state.name;
-            document.getElementById('in-buy').value = state.buyin;
-            document.getElementById('in-dur').value = state.duration;
-            document.getElementById('in-blinds').value = state.structure.join('\n');
-            const hasAnte = state.structure.some(l => {
-                let parts = l.split('/');
-                return parts.length >= 3 && !parts[2].toUpperCase().includes('PAUSE');
-            });
-            document.getElementById('in-antes-toggle').checked = hasAnte;
-            
-            // Restore Custom String
-            document.getElementById('in-paid-select').value = state.paidMode;
-            document.getElementById('in-paid-custom-str').value = state.customPaidStr || "";
-            toggleCustomPaid();
-
-            document.getElementById('modal').style.display = 'flex'; 
-        }
-        function closeSettings() { document.getElementById('modal').style.display = 'none'; }
-        function save() { localStorage.setItem('nutz_pro_v6', JSON.stringify(state)); }
-
-        window.onload = () => {
-            const saved = localStorage.getItem('nutz_pro_v6');
-            if(saved) {
-                state = JSON.parse(saved); state.playing = false;
-                if(state.muted === undefined) state.muted = false; 
-                document.getElementById('in-name').value = state.name; 
-            } else { applySettings(); }
-            setMode('qty');
-            render();
-        };
-    </script>
+    <script src="script.js"></script>
 </body>
 </html>
