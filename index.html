@@ -81,10 +81,51 @@
         <div class="toast-content" id="toast-content"></div>
     </div>
 
+    <!-- BOUNTY KILLER SELECTION MODAL -->
+    <div id="bounty-modal" class="modal" style="display:none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <div style="padding: 25px; padding-bottom: 15px;">
+                <h2 style="margin: 0 0 10px 0; font-size: 1.3rem; font-weight: 700;" id="bounty-modal-title">Qui a éliminé ?</h2>
+                <p style="color: var(--secondary); font-size: 0.9rem; margin: 0 0 15px 0;">Sélectionnez le joueur qui remporte le bounty</p>
+
+                <div style="position: relative; margin-bottom: 20px;">
+                    <input type="text" id="bounty-search" placeholder="Rechercher un joueur..."
+                           style="width: 100%; padding: 12px 12px 12px 40px; background: var(--input-bg); border: 1px solid var(--border); border-radius: 8px; color: var(--accent); font-size: 15px;"
+                           oninput="filterBountyPlayers()">
+                    <svg style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; stroke: var(--secondary); fill: none; pointer-events: none;" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </div>
+            </div>
+
+            <div id="bounty-modal-scroll" style="max-height: 60vh; overflow-y: auto; padding: 0 25px;">
+                <div id="bounty-same-table-section" style="display:none;">
+                    <span class="list-header" style="position: relative;">Même table</span>
+                    <div id="bounty-same-table-list" class="bounty-player-grid"></div>
+                </div>
+
+                <div id="bounty-other-tables-section" style="display:none; margin-top: 20px;">
+                    <span class="list-header" style="position: relative;">Autres tables</span>
+                    <div id="bounty-other-tables-list" class="bounty-player-grid"></div>
+                </div>
+
+                <div id="bounty-no-results" style="display:none; text-align: center; padding: 40px 20px; color: var(--secondary);">
+                    <p style="margin: 0; font-size: 14px;">Aucun joueur trouvé</p>
+                </div>
+            </div>
+
+            <div style="padding: 15px 25px 25px 25px;">
+                <button class="modal-btn-cancel" onclick="closeBountyModal()" style="width: 100%;">Annuler</button>
+            </div>
+        </div>
+    </div>
+
     <!-- MODAL REGLAGES -->
     <div id="modal" class="modal">
         <div class="modal-content">
             <div class="modal-body">
+                <!-- COLONNE GAUCHE -->
                 <div>
                     <span class="modal-section-title">Général</span>
                     <div class="input-group">
@@ -92,27 +133,22 @@
                         <input type="text" id="in-name" placeholder="">
                     </div>
                     <div class="input-group">
-                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Buy-in (€)</label>
-                        <input type="number" id="in-buy" placeholder="">
-                    </div>
-                    <div class="input-group">
-                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Prix Rebuy/Add-on (€)</label>
-                        <input type="number" id="in-rebuy" placeholder="">
-                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Si vide, même prix que le buy-in</p>
-                    </div>
-                    <div class="input-group">
                         <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Durée des niveaux (min)</label>
                         <input type="number" id="in-dur" value="15">
                     </div>
 
-                    <span class="modal-section-title" style="margin-top:20px;">Multi-Tables</span>
-                    <div class="input-group">
-                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Places par table</label>
-                        <input type="number" id="in-table-size" placeholder="">
-                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Ex: 9 pour des tables de 9 joueurs max. 0 ou vide = une seule table.</p>
+                    <span class="modal-section-title" style="margin-top:20px;">Buy-in & Prix</span>
+                    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                        <div style="flex: 1;">
+                            <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Buy-in (€)</label>
+                            <input type="number" id="in-buy" placeholder="">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Rebuy (€)</label>
+                            <input type="number" id="in-rebuy" placeholder="">
+                        </div>
                     </div>
-
-                    <span class="modal-section-title" style="margin-top:20px;">Répartition des Prix</span>
+                    <p style="font-size:11px; color:var(--secondary); margin:-10px 0 15px 0;">Si rebuy vide, même prix que le buy-in</p>
                     <div class="input-group">
                         <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Mode de paiement</label>
                         <select id="in-paid-select" onchange="toggleCustomPaid()">
@@ -123,10 +159,25 @@
                             <option value="custom">Répartition perso...</option>
                         </select>
                         <input type="text" id="in-paid-custom-str" style="display:none; margin-top:5px;" placeholder="">
-                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Entrez soit des pourcentages (ex: 50/30/20) soit les montants exacts (ex: 25/10/5).</p>
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Pourcentages (ex: 50/30/20) ou montants exacts (ex: 25/10/5)</p>
+                    </div>
+
+                    <span class="modal-section-title" style="margin-top:20px;">Bounty</span>
+                    <div class="switch-group">
+                        <span style="font-size:12px; color:var(--secondary); font-weight:600;">Mode Bounty</span>
+                        <label class="switch">
+                            <input type="checkbox" id="in-bounty-toggle" onchange="toggleBountyInput()">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="input-group" id="bounty-input-group">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Valeur du Bounty (€)</label>
+                        <input type="number" id="in-bounty-amount" placeholder="">
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Montant prélevé sur chaque buy-in et rebuy</p>
                     </div>
                 </div>
 
+                <!-- COLONNE DROITE -->
                 <div>
                     <span class="modal-section-title">Joueurs</span>
                     <div class="toggle-container">
@@ -141,6 +192,20 @@
                     <div id="box-list" style="display:none">
                         <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Liste des noms</label>
                         <textarea id="in-players" rows="5" placeholder=""></textarea>
+                    </div>
+
+                    <span class="modal-section-title" style="margin-top:20px;">Multi-Tables</span>
+                    <div class="switch-group">
+                        <span style="font-size:12px; color:var(--secondary); font-weight:600;">Mode Multi-Tables</span>
+                        <label class="switch">
+                            <input type="checkbox" id="in-multitable-toggle" onchange="toggleMultiTableInput()">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="input-group" id="multitable-input-group">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Places par table</label>
+                        <input type="number" id="in-table-size" placeholder="">
+                        <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Ex: 9 pour des tables de 9 joueurs max</p>
                     </div>
 
                     <div class="switch-group" style="margin-top:20px;">

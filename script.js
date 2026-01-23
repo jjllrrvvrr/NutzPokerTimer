@@ -6,7 +6,7 @@ function openTab(tabName, btn) {
 }
 
 // --- STATE & AUDIO ---
-let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false, rebuyPrice: 20, tableSize: 0 };
+let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false, rebuyPrice: 20, tableSize: 0, bountyEnabled: false, bountyAmount: 0 };
 let clock = null;
 
 // SON AMONG US
@@ -170,6 +170,18 @@ function setMode(m) {
     document.getElementById('box-list').style.display = m==='list'?'block':'none';
 }
 
+function toggleMultiTableInput() {
+    const toggle = document.getElementById('in-multitable-toggle');
+    const inputGroup = document.getElementById('multitable-input-group');
+    inputGroup.style.display = toggle.checked ? 'block' : 'none';
+}
+
+function toggleBountyInput() {
+    const toggle = document.getElementById('in-bounty-toggle');
+    const inputGroup = document.getElementById('bounty-input-group');
+    inputGroup.style.display = toggle.checked ? 'block' : 'none';
+}
+
 function toggleAntesStruct() {
     const chk = document.getElementById('in-antes-toggle');
     const txt = document.getElementById('in-blinds');
@@ -203,25 +215,56 @@ function applySettings() {
     state.name = document.getElementById('in-name').value || "NUTZ POKER";
     state.buyin = parseInt(document.getElementById('in-buy').value) || 0;
     state.rebuyPrice = parseInt(document.getElementById('in-rebuy').value) || state.buyin;
-    state.tableSize = parseInt(document.getElementById('in-table-size').value) || 0;
+
+    // Multi-tables : vérifier le toggle
+    const multiTableEnabled = document.getElementById('in-multitable-toggle').checked;
+    state.tableSize = multiTableEnabled ? (parseInt(document.getElementById('in-table-size').value) || 0) : 0;
+
+    state.bountyEnabled = document.getElementById('in-bounty-toggle').checked;
+    state.bountyAmount = parseInt(document.getElementById('in-bounty-amount').value) || 0;
     state.duration = parseInt(document.getElementById('in-dur').value) || 15;
     state.paidMode = document.getElementById('in-paid-select').value;
     state.customPaidStr = document.getElementById('in-paid-custom-str').value;
-    state.structure = document.getElementById('in-blinds').value.split('\n').filter(l => l.trim());
+
+    // Structure des blinds avec valeur par défaut
+    const blindsValue = document.getElementById('in-blinds').value.trim();
+    if (blindsValue) {
+        state.structure = blindsValue.split('\n').filter(l => l.trim());
+    } else {
+        // Structure par défaut si le champ est vide
+        state.structure = [
+            '25/50',
+            '50/100',
+            '75/150',
+            '100/200',
+            '200/400/200',
+            '300/600/300',
+            '400/800/400',
+            '500/1000/500',
+            '600/1200/600',
+            '800/1600/800',
+            '1000/2000/1000',
+            '1500/3000/1500',
+            '2000/4000/2000',
+            '3000/6000/3000',
+            '5000/10000/5000'
+        ];
+    }
 
     if (state.mode === 'qty') {
         let count = parseInt(document.getElementById('in-qty').value) || 0;
         if(state.players.length !== count) {
-             state.players = Array.from({length: count}, (_, i) => ({ name: `Joueur ${i+1}`, out: false, rank: null, rebuys: 0, table: null }));
+             state.players = Array.from({length: count}, (_, i) => ({ name: `Joueur ${i+1}`, out: false, rank: null, rebuys: 0, table: null, bounties: 0 }));
         } else {
             // Garder les joueurs existants mais s'assurer qu'ils ont les propriétés nécessaires
             state.players.forEach(p => {
                 if(p.rebuys === undefined) p.rebuys = 0;
                 if(p.table === undefined) p.table = null;
+                if(p.bounties === undefined) p.bounties = 0;
             });
         }
     } else {
-        state.players = document.getElementById('in-players').value.split(/[\n,;]+/).map(n => ({name: n.trim(), out: false, rank: null, rebuys: 0, table: null})).filter(p => p.name);
+        state.players = document.getElementById('in-players').value.split(/[\n,;]+/).map(n => ({name: n.trim(), out: false, rank: null, rebuys: 0, table: null, bounties: 0})).filter(p => p.name);
     }
 
     // Assigner les tables si multi-tables activé
@@ -235,8 +278,12 @@ function applySettings() {
 
 function getPayouts() {
     // Calcul du pot : buy-ins + rebuys
-    const totalBuyins = state.players.length * state.buyin;
-    const totalRebuys = state.players.reduce((sum, p) => sum + (p.rebuys || 0) * state.rebuyPrice, 0);
+    // Si bounty activé, retirer la partie bounty du prize pool
+    const buyinPrizePool = state.bountyEnabled ? (state.buyin - state.bountyAmount) : state.buyin;
+    const rebuyPrizePool = state.bountyEnabled ? (state.rebuyPrice - state.bountyAmount) : state.rebuyPrice;
+
+    const totalBuyins = state.players.length * buyinPrizePool;
+    const totalRebuys = state.players.reduce((sum, p) => sum + (p.rebuys || 0) * rebuyPrizePool, 0);
     const pot = totalBuyins + totalRebuys;
     if(pot <= 0) return [];
 
@@ -351,14 +398,31 @@ function render() {
         return 0;
     });
 
+    let currentTable = null;
     sortedPlayers.forEach((p) => {
         const idx = state.players.indexOf(p);
         const rebuyBadge = (p.rebuys || 0) > 0 ? `<span class="rebuy-badge">+${p.rebuys}</span>` : '';
 
-        // Badge de table (uniquement si multi-tables activé et joueur actif)
-        const tableBadge = (state.tableSize > 0 && !p.out && p.table)
-            ? `<span class="table-badge">T${p.table}</span>`
+        // Badge bounty (si bounty activé et joueur a des bounties)
+        const bountyBadge = (state.bountyEnabled && (p.bounties || 0) > 0)
+            ? `<span class="bounty-badge">🎯${p.bounties}</span>`
             : '';
+
+        // Afficher séparateur de table si nécessaire
+        if (state.tableSize > 0 && !p.out && p.table !== currentTable) {
+            if (currentTable !== null) {
+                // Pas de séparateur avant la première table
+                listUI.innerHTML += `<div class="table-separator"></div>`;
+            }
+            // Compter les joueurs de cette table
+            const tablePlayerCount = sortedPlayers.filter(pl => !pl.out && pl.table === p.table).length;
+            listUI.innerHTML += `
+                <div class="table-header">
+                    <span class="table-header-text">Table ${p.table}</span>
+                    <span class="table-header-count">${tablePlayerCount} joueur${tablePlayerCount > 1 ? 's' : ''}</span>
+                </div>`;
+            currentTable = p.table;
+        }
 
         // Bouton d'élimination rapide (uniquement pour les joueurs actifs)
         const eliminateBtn = !p.out
@@ -367,7 +431,7 @@ function render() {
 
         listUI.innerHTML += `
             <div class="player-row ${p.out ? 'out' : ''}" onclick="showPlayerMenu(event, ${idx})">
-                <span>${tableBadge}${p.name} ${rebuyBadge} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span>
+                <span>${p.name} ${rebuyBadge} ${bountyBadge} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span>
                 <span>${p.out ? 'OUT' : eliminateBtn}</span>
             </div>`;
     });
@@ -376,7 +440,17 @@ function render() {
     // Calcul du pot total avec rebuys
     const totalBuyins = state.players.length * state.buyin;
     const totalRebuys = state.players.reduce((sum, p) => sum + (p.rebuys || 0) * state.rebuyPrice, 0);
-    document.getElementById('ui-total-pot').innerText = totalBuyins + totalRebuys;
+    const grandTotal = totalBuyins + totalRebuys;
+
+    // Si bounty activé, afficher le prize pool (sans bounties)
+    if (state.bountyEnabled) {
+        const buyinPrizePool = state.buyin - state.bountyAmount;
+        const rebuyPrizePool = state.rebuyPrice - state.bountyAmount;
+        const prizePoolTotal = state.players.length * buyinPrizePool + state.players.reduce((sum, p) => sum + (p.rebuys || 0) * rebuyPrizePool, 0);
+        document.getElementById('ui-total-pot').innerText = prizePoolTotal + ' + ' + (grandTotal - prizePoolTotal) + ' bounty';
+    } else {
+        document.getElementById('ui-total-pot').innerText = grandTotal;
+    }
 
     const payUI = document.getElementById('ui-payouts'); payUI.innerHTML = "";
     getPayouts().forEach(p => payUI.innerHTML += `<div class="row" style="cursor:default"><span>${p.label}</span><span>${p.val}€</span></div>`);
@@ -407,6 +481,83 @@ function toggleTimer() {
     render();
 }
 
+// --- GÉNÉRATION AUTOMATIQUE DES BLINDS ---
+let lastGenerationLevel = -1; // Pour éviter de générer plusieurs fois
+
+function generateNextBlinds() {
+    // Éviter de générer plusieurs fois pour le même niveau
+    if (lastGenerationLevel === state.level) return;
+    lastGenerationLevel = state.level;
+
+    // Filtrer les niveaux de blinds (sans les pauses)
+    const blindLevels = state.structure.filter(l => !l.toUpperCase().includes('PAUSE'));
+
+    if (blindLevels.length < 2) return; // Pas assez de données pour détecter un pattern
+
+    // Analyser les derniers niveaux pour détecter le pattern
+    const lastLevel = blindLevels[blindLevels.length - 1];
+    const secondLastLevel = blindLevels[blindLevels.length - 2];
+
+    // Parser le dernier niveau
+    const parseBlinds = (str) => {
+        const parts = str.split('/').map(p => parseInt(p.trim()));
+        return {
+            sb: parts[0] || 0,
+            bb: parts[1] || 0,
+            ante: parts[2] || 0
+        };
+    };
+
+    const last = parseBlinds(lastLevel);
+    const secondLast = parseBlinds(secondLastLevel);
+
+    // Calculer le ratio de progression (typiquement entre 1.5 et 2)
+    const ratio = last.bb / secondLast.bb;
+    const hasAntes = last.ante > 0;
+
+    // Générer 5 nouveaux niveaux
+    const newLevels = [];
+    let currentSB = last.sb;
+    let currentBB = last.bb;
+    let currentAnte = last.ante;
+
+    for (let i = 0; i < 5; i++) {
+        // Appliquer le ratio et arrondir intelligemment
+        currentBB = Math.ceil(currentBB * ratio);
+        currentSB = Math.ceil(currentBB / 2);
+
+        // Arrondir aux valeurs "propres" (multiples de 100, 500, 1000, etc.)
+        if (currentBB >= 10000) {
+            currentBB = Math.round(currentBB / 1000) * 1000;
+            currentSB = Math.round(currentSB / 1000) * 1000;
+        } else if (currentBB >= 1000) {
+            currentBB = Math.round(currentBB / 100) * 100;
+            currentSB = Math.round(currentSB / 100) * 100;
+        } else if (currentBB >= 100) {
+            currentBB = Math.round(currentBB / 25) * 25;
+            currentSB = Math.round(currentSB / 25) * 25;
+        }
+
+        if (hasAntes) {
+            currentAnte = currentBB; // Ante = BB
+            newLevels.push(`${currentSB}/${currentBB}/${currentAnte}`);
+        } else {
+            newLevels.push(`${currentSB}/${currentBB}`);
+        }
+    }
+
+    // Ajouter les nouveaux niveaux à la structure
+    state.structure.push(...newLevels);
+    save();
+
+    // Notifier l'utilisateur
+    showToast(
+        `📈 Blinds générées automatiquement`,
+        `5 nouveaux niveaux ajoutés automatiquement pour continuer le tournoi`,
+        5000
+    );
+}
+
 function handleLevelEnd() {
     triggerAlert();
     const line = state.structure[state.level] || "";
@@ -414,13 +565,26 @@ function handleLevelEnd() {
         state.isPause = true; state.timeLeft = (parseInt(line.toUpperCase().split("PAUSE")[1]) || 5) * 60;
     } else {
         state.isPause = false; state.level++; state.timeLeft = state.duration * 60;
+
+        // Générer automatiquement de nouveaux niveaux si on approche de la fin
+        if(state.level >= state.structure.length - 2) {
+            generateNextBlinds();
+        }
+
         if(state.level >= state.structure.length) { clearInterval(clock); state.playing = false; }
     }
 }
 function changeLvl(dir) {
     unlockAudio();
     state.level = Math.max(0, Math.min(state.structure.length - 1, state.level + dir));
-    if(dir > 0) triggerAlert();
+    if(dir > 0) {
+        triggerAlert();
+
+        // Générer automatiquement de nouveaux niveaux si on approche de la fin
+        if(state.level >= state.structure.length - 2) {
+            generateNextBlinds();
+        }
+    }
     state.isPause = false; state.timeLeft = state.duration * 60; render();
 }
 // --- NOTIFICATIONS TOAST ---
@@ -742,13 +906,192 @@ function changePlayerTable(i) {
     }
 }
 
+// --- BOUNTY MODAL ---
+let bountyModalData = { eliminatedPlayerIndex: -1, eliminatedPlayerTable: null };
+
+function showBountyModal(eliminatedPlayerIndex, eliminatedPlayerTable) {
+    // Sauvegarder les données pour le filtrage
+    bountyModalData = { eliminatedPlayerIndex, eliminatedPlayerTable };
+
+    const eliminatedPlayer = state.players[eliminatedPlayerIndex];
+
+    // Titre de la modal
+    document.getElementById('bounty-modal-title').textContent = `Qui a éliminé ${eliminatedPlayer.name} ?`;
+
+    // Réinitialiser la recherche
+    document.getElementById('bounty-search').value = '';
+
+    // Afficher la modal
+    document.getElementById('bounty-modal').style.display = 'flex';
+
+    // Rendre les joueurs
+    renderBountyPlayers();
+
+    // Focus sur la barre de recherche
+    setTimeout(() => {
+        document.getElementById('bounty-search').focus();
+    }, 100);
+}
+
+function renderBountyPlayers(searchQuery = '') {
+    const { eliminatedPlayerIndex, eliminatedPlayerTable } = bountyModalData;
+    const activePlayers = state.players.filter(p => !p.out);
+
+    // Filtrer selon la recherche
+    let filteredPlayers = activePlayers;
+    if (searchQuery) {
+        const query = searchQuery.toLowerCase();
+        filteredPlayers = activePlayers.filter(p => {
+            const playerIndex = state.players.indexOf(p);
+            const playerNumber = (playerIndex + 1).toString();
+            return p.name.toLowerCase().includes(query) || playerNumber.includes(query);
+        });
+    }
+
+    // Séparer les joueurs par table
+    const sameTable = filteredPlayers.filter(p => p.table === eliminatedPlayerTable && eliminatedPlayerTable !== null);
+    const otherTables = filteredPlayers.filter(p => p.table !== eliminatedPlayerTable || eliminatedPlayerTable === null);
+
+    // Section même table
+    const sameTableSection = document.getElementById('bounty-same-table-section');
+    const sameTableList = document.getElementById('bounty-same-table-list');
+    sameTableList.innerHTML = '';
+
+    if (sameTable.length > 0) {
+        sameTableSection.style.display = 'block';
+        sameTable.forEach(p => {
+            const idx = state.players.indexOf(p);
+            const playerNumber = idx + 1;
+            const bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+            const tableInfo = state.tableSize > 0 ? `T${p.table}` : '';
+
+            sameTableList.innerHTML += `
+                <div class="bounty-player-card" onclick="assignBounty(${eliminatedPlayerIndex}, ${idx})" data-player-name="${p.name.toLowerCase()}" data-player-number="${playerNumber}">
+                    <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
+                    <div class="bounty-player-info">
+                        ${tableInfo ? `<span>${tableInfo}</span>` : ''}
+                        ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
+                    </div>
+                </div>`;
+        });
+    } else {
+        sameTableSection.style.display = 'none';
+    }
+
+    // Section autres tables
+    const otherTablesSection = document.getElementById('bounty-other-tables-section');
+    const otherTablesList = document.getElementById('bounty-other-tables-list');
+    otherTablesList.innerHTML = '';
+
+    if (otherTables.length > 0) {
+        otherTablesSection.style.display = 'block';
+        otherTables.forEach(p => {
+            const idx = state.players.indexOf(p);
+            const playerNumber = idx + 1;
+            const bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+            const tableInfo = state.tableSize > 0 ? `T${p.table}` : '';
+
+            otherTablesList.innerHTML += `
+                <div class="bounty-player-card" onclick="assignBounty(${eliminatedPlayerIndex}, ${idx})" data-player-name="${p.name.toLowerCase()}" data-player-number="${playerNumber}">
+                    <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
+                    <div class="bounty-player-info">
+                        ${tableInfo ? `<span>${tableInfo}</span>` : ''}
+                        ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
+                    </div>
+                </div>`;
+        });
+    } else {
+        otherTablesSection.style.display = 'none';
+    }
+
+    // Afficher message "Aucun résultat" si nécessaire
+    const noResults = document.getElementById('bounty-no-results');
+    if (filteredPlayers.length === 0) {
+        noResults.style.display = 'block';
+        sameTableSection.style.display = 'none';
+        otherTablesSection.style.display = 'none';
+    } else {
+        noResults.style.display = 'none';
+    }
+}
+
+function filterBountyPlayers() {
+    const searchQuery = document.getElementById('bounty-search').value;
+    renderBountyPlayers(searchQuery);
+}
+
+function closeBountyModal() {
+    document.getElementById('bounty-modal').style.display = 'none';
+    document.getElementById('bounty-search').value = '';
+    // Continuer le traitement de l'élimination sans bounty
+    rebalanceTables();
+    save();
+    render();
+}
+
+function assignBounty(eliminatedPlayerIndex, killerPlayerIndex) {
+    const eliminatedPlayer = state.players[eliminatedPlayerIndex];
+    const killer = state.players[killerPlayerIndex];
+
+    // Calculer le nombre de bounties gagnés
+    const bountiesWon = 1 + (eliminatedPlayer.rebuys || 0);
+    if (!killer.bounties) killer.bounties = 0;
+    killer.bounties += bountiesWon;
+
+    // Fermer la modal
+    document.getElementById('bounty-modal').style.display = 'none';
+    document.getElementById('bounty-search').value = '';
+
+    // Notification
+    const totalValue = bountiesWon * state.bountyAmount;
+    showToast(`💰 Bounty`, `<span class="player-change">${killer.name}</span> gagne ${bountiesWon} bounty(s) (${totalValue}€) pour avoir éliminé ${eliminatedPlayer.name}`, 6000);
+
+    // Continuer le traitement de l'élimination
+    rebalanceTables();
+
+    // Gérer les confetti si nécessaire
+    const alive = state.players.filter(x => !x.out).length;
+    if (alive === 1) {
+        // Cas spécial du heads-up
+        const nbPaidPlaces = getPayouts().length;
+        if(2 <= nbPaidPlaces) {
+            confettiMedium(); // 2e place
+        }
+        setTimeout(() => {
+            const winner = state.players.find(x => !x.out);
+            winner.rank = 1;
+            confettiBig(winner.name);
+        }, 800);
+    } else {
+        // Logique normale pour les autres éliminations
+        const nbPaidPlaces = getPayouts().length;
+        if(eliminatedPlayer.rank <= nbPaidPlaces) {
+            if(eliminatedPlayer.rank === 3) {
+                confettiSmall();
+            } else if(eliminatedPlayer.rank > 3) {
+                confettiSmall();
+            }
+        }
+    }
+
+    save();
+    render();
+}
+
 function toggleOut(i) {
     const p = state.players[i];
     if(!p.out) {
         const alive = state.players.filter(x => !x.out).length;
         p.out = true;
         p.rank = alive;
+        const eliminatedPlayerTable = p.table;
         p.table = null; // Retirer de la table
+
+        // Si bounty activé, ouvrir la modal de sélection
+        if (state.bountyEnabled && alive > 1) {
+            showBountyModal(i, eliminatedPlayerTable);
+            return; // On sort de la fonction, rebalanceTables() sera appelé après sélection
+        }
 
         // Rééquilibrer les tables après élimination
         rebalanceTables();
@@ -803,14 +1146,61 @@ function toggleOut(i) {
     save();
     render();
 }
-function resetApp() { if(confirm("Supprimer toutes les données et recommencer ?")) { localStorage.removeItem('nutz_pro_v6'); location.reload(); } }
+function resetApp() {
+    if(confirm("Supprimer toutes les données et recommencer ?")) {
+        localStorage.removeItem('nutz_pro_v6');
+        // Réinitialiser les valeurs du formulaire avec les défauts
+        document.getElementById('in-name').value = 'NUTZ POKER';
+        document.getElementById('in-buy').value = '20';
+        document.getElementById('in-rebuy').value = '';
+        document.getElementById('in-multitable-toggle').checked = false;
+        document.getElementById('in-table-size').value = '';
+        document.getElementById('multitable-input-group').style.display = 'none';
+        document.getElementById('in-bounty-toggle').checked = false;
+        document.getElementById('in-bounty-amount').value = '';
+        document.getElementById('bounty-input-group').style.display = 'none';
+        document.getElementById('in-dur').value = '15';
+        document.getElementById('in-qty').value = '10';
+        document.getElementById('in-paid-select').value = 'auto';
+        document.getElementById('in-antes-toggle').checked = false;
+        document.getElementById('in-blinds').value = `25/50
+50/100
+75/150
+100/200
+200/400/200
+300/600/300
+400/800/400
+500/1000/500
+600/1200/600
+800/1600/800
+1000/2000/1000
+1500/3000/1500
+2000/4000/2000
+3000/6000/3000
+5000/10000/5000`;
+        // Appliquer les nouveaux réglages
+        applySettings();
+    }
+}
 
 function openSettings() {
     unlockAudio();
     document.getElementById('in-name').value = state.name;
     document.getElementById('in-buy').value = state.buyin;
     document.getElementById('in-rebuy').value = state.rebuyPrice || state.buyin;
+
+    // Multi-tables
+    const multiTableEnabled = state.tableSize > 0;
+    document.getElementById('in-multitable-toggle').checked = multiTableEnabled;
     document.getElementById('in-table-size').value = state.tableSize || '';
+    document.getElementById('multitable-input-group').style.display = multiTableEnabled ? 'block' : 'none';
+
+    // Bounty
+    const bountyEnabled = state.bountyEnabled || false;
+    document.getElementById('in-bounty-toggle').checked = bountyEnabled;
+    document.getElementById('in-bounty-amount').value = state.bountyAmount || '';
+    document.getElementById('bounty-input-group').style.display = bountyEnabled ? 'block' : 'none';
+
     document.getElementById('in-dur').value = state.duration;
     document.getElementById('in-blinds').value = state.structure.join('\n');
     const hasAnte = state.structure.some(l => {
@@ -836,10 +1226,33 @@ window.onload = () => {
         if(state.muted === undefined) state.muted = false;
         if(state.rebuyPrice === undefined) state.rebuyPrice = state.buyin;
         if(state.tableSize === undefined) state.tableSize = 0;
+        if(state.bountyEnabled === undefined) state.bountyEnabled = false;
+        if(state.bountyAmount === undefined) state.bountyAmount = 0;
+        // S'assurer que la structure des blinds existe
+        if(!state.structure || state.structure.length === 0) {
+            state.structure = [
+                '25/50',
+                '50/100',
+                '75/150',
+                '100/200',
+                '200/400/200',
+                '300/600/300',
+                '400/800/400',
+                '500/1000/500',
+                '600/1200/600',
+                '800/1600/800',
+                '1000/2000/1000',
+                '1500/3000/1500',
+                '2000/4000/2000',
+                '3000/6000/3000',
+                '5000/10000/5000'
+            ];
+        }
         // S'assurer que tous les joueurs ont les propriétés nécessaires
         state.players.forEach(p => {
             if(p.rebuys === undefined) p.rebuys = 0;
             if(p.table === undefined) p.table = null;
+            if(p.bounties === undefined) p.bounties = 0;
         });
         document.getElementById('in-name').value = state.name;
     } else { applySettings(); }
