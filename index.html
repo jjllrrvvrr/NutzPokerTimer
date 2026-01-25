@@ -3,9 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#000000">
     <title>Nutz Poker Timer</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=2.0">
+    <!-- Version 2.0: PWA + Optimizations + Multi-table + Bounty + Reset Fix -->
 </head>
 <body data-theme="dark">
 
@@ -17,9 +20,6 @@
             </a>
             <button onclick="toggleFS()" class="icon-btn" title="Plein écran"><svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path></svg></button>
             <button onclick="toggleTheme()" class="icon-btn" id="theme-icon" title="Thème"><svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg></button>
-            <button onclick="toggleMute()" class="icon-btn" id="mute-icon" title="Son">
-                <svg viewBox="0 0 24 24" id="icon-sound-on"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>
-            </button>
             <button onclick="openSettings()" class="icon-btn" title="Réglages">
                 <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
             </button>
@@ -53,11 +53,11 @@
     </div>
 
     <div class="footer-controls">
-        <button class="btn-ctrl" onclick="changeLvl(-1)" title="Niveau Précédent">
+        <button class="btn-ctrl" id="prev-level-btn" onclick="changeLvl(-1)" title="Niveau Précédent">
             <svg viewBox="0 0 24 24"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
         </button>
         <button class="btn-primary" id="play-btn" onclick="toggleTimer()">DÉMARRER</button>
-        <button class="btn-ctrl" onclick="changeLvl(1)" title="Niveau Suivant">
+        <button class="btn-ctrl" id="next-level-btn" onclick="changeLvl(1)" title="Niveau Suivant">
             <svg viewBox="0 0 24 24"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
         </button>
     </div>
@@ -175,6 +175,23 @@
                         <input type="number" id="in-bounty-amount" placeholder="">
                         <p style="font-size:11px; color:var(--secondary); margin:5px 0 0 0;">Montant prélevé sur chaque buy-in et rebuy</p>
                     </div>
+                    <div class="switch-group" id="pko-switch-group" style="margin-top:15px; display:none;">
+                        <span style="font-size:12px; color:var(--secondary); font-weight:600;">Progressive Knockout (PKO)</span>
+                        <label class="switch">
+                            <input type="checkbox" id="in-pko-toggle" onchange="togglePKOInput()">
+                            <span class="slider round"></span>
+                        </label>
+                    </div>
+                    <div class="input-group" id="pko-input-group" style="display:none;">
+                        <label style="font-size:12px; color:var(--secondary); display:block; margin-bottom:5px;">Part au killer (%)</label>
+                        <input type="range" id="in-pko-slider" min="0" max="100" value="50" oninput="updatePKOLabel()" style="width: 100%;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px;">
+                            <span style="font-size:11px; color:var(--secondary);">0% (tout sur sa tête)</span>
+                            <span id="pko-value-label" style="font-size:13px; font-weight:700; color:var(--accent);">50%</span>
+                            <span style="font-size:11px; color:var(--secondary);">100% (tout au killer)</span>
+                        </div>
+                        <p style="font-size:11px; color:var(--secondary); margin:8px 0 0 0;">À chaque élimination, le bounty est partagé entre le killer et ajouté à sa propre tête</p>
+                    </div>
                 </div>
 
                 <!-- COLONNE DROITE -->
@@ -244,6 +261,6 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=4.0"></script>
 </body>
 </html>

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Générer Icônes PWA - Nutz Poker</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #1a1a1a;
+            color: #fff;
+        }
+        h1 { color: #FFD700; }
+        canvas { border: 2px solid #FFD700; margin: 10px; }
+        button {
+            background: #FFD700;
+            color: #000;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 10px;
+            border-radius: 5px;
+        }
+        button:hover { background: #FFA500; }
+        .preview { display: flex; gap: 20px; flex-wrap: wrap; margin: 20px 0; }
+        .info { background: #2a2a2a; padding: 15px; border-radius: 5px; margin: 20px 0; }
+    </style>
+</head>
+<body>
+    <h1>🎰 Générateur d'Icônes PWA - Nutz Poker</h1>
+
+    <div class="info">
+        <p><strong>Instructions:</strong></p>
+        <ol>
+            <li>Cliquez sur les boutons ci-dessous pour télécharger les icônes</li>
+            <li>Les fichiers seront sauvegardés dans votre dossier Téléchargements</li>
+            <li>Déplacez-les dans le dossier /NutzPokerTimer/</li>
+        </ol>
+    </div>
+
+    <div class="preview">
+        <div>
+            <h3>192x192</h3>
+            <canvas id="canvas192" width="192" height="192"></canvas>
+            <br>
+            <button onclick="downloadIcon(192)">📥 Télécharger icon-192.png</button>
+        </div>
+        <div>
+            <h3>512x512</h3>
+            <canvas id="canvas512" width="512" height="512"></canvas>
+            <br>
+            <button onclick="downloadIcon(512)">📥 Télécharger icon-512.png</button>
+        </div>
+    </div>
+
+    <script>
+        function drawIcon(size) {
+            const canvas = document.getElementById(`canvas${size}`);
+            const ctx = canvas.getContext('2d');
+
+            // Background gradient
+            const gradient = ctx.createLinearGradient(0, 0, size, size);
+            gradient.addColorStop(0, '#1a1a1a');
+            gradient.addColorStop(1, '#2a2a2a');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, size, size);
+
+            // Border
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = size / 40;
+            ctx.strokeRect(size / 20, size / 20, size * 0.9, size * 0.9);
+
+            // Text "NP"
+            ctx.fillStyle = '#FFD700';
+            ctx.font = `bold ${size * 0.35}px Arial, sans-serif`;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('NP', size / 2, size / 2);
+
+            // Poker chip circles
+            ctx.strokeStyle = '#FFD700';
+            ctx.lineWidth = size / 60;
+            for (let i = 0; i < 4; i++) {
+                const angle = (i * Math.PI / 2) + Math.PI / 4;
+                const x = size / 2 + Math.cos(angle) * (size * 0.35);
+                const y = size / 2 + Math.sin(angle) * (size * 0.35);
+                ctx.beginPath();
+                ctx.arc(x, y, size / 20, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+        }
+
+        function downloadIcon(size) {
+            const canvas = document.getElementById(`canvas${size}`);
+            canvas.toBlob(blob => {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `icon-${size}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+
+        // Draw icons on load
+        drawIcon(192);
+        drawIcon(512);
+    </script>
+</body>
+</html>

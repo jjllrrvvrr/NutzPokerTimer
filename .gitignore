@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Internal bug tracking
+BUGS_REMAINING.md
+CORRECTIONS_APPLIQUEES.md
+
+# Claude conversation logs
+.claude/

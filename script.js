@@ -6,8 +6,11 @@ function openTab(tabName, btn) {
 }
 
 // --- STATE & AUDIO ---
-let state = { theme: 'dark', muted: false, name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false, rebuyPrice: 20, tableSize: 0, bountyEnabled: false, bountyAmount: 0 };
+let state = { theme: 'dark', name: 'NUTZ POKER', buyin: 20, duration: 15, level: 0, timeLeft: 900, playing: false, mode: 'qty', paidMode: 'auto', customPaidStr: "", players: [], structure: [], isPause: false, rebuyPrice: 20, tableSize: 0, bountyEnabled: false, bountyAmount: 0, pkoEnabled: false, pkoKillerShare: 50 };
 let clock = null;
+let confettiIntervals = []; // Track confetti intervals pour éviter les fuites mémoire
+let isToggling = false; // Flag pour éviter race condition sur toggleTimer
+let bountyModalOpen = false; // Flag pour empêcher éliminations multiples
 
 // SON AMONG US
 const alarmSound = new Audio("https://www.myinstants.com/media/sounds/among.mp3");
@@ -20,14 +23,12 @@ function unlockAudio() {
 }
 
 function playTone() {
-    if(state.muted) return;
     alarmSound.currentTime = 0;
     alarmSound.play().catch(e => console.log("Audio blocked", e));
 }
 
 function toggleTheme() { state.theme = state.theme === 'dark' ? 'light' : 'dark'; render(); }
 function toggleFS() { if (!document.fullscreenElement) document.documentElement.requestFullscreen(); else if (document.exitFullscreen) document.exitFullscreen(); }
-function toggleMute() { state.muted = !state.muted; render(); }
 
 // --- EFFETS CONFETTI ---
 function confettiSmall() {
@@ -54,26 +55,34 @@ function confettiMedium() {
     const end = Date.now() + duration;
 
     const interval = setInterval(() => {
-        if (Date.now() > end) {
-            clearInterval(interval);
-            return;
-        }
+        try {
+            if (Date.now() > end) {
+                clearInterval(interval);
+                confettiIntervals = confettiIntervals.filter(id => id !== interval);
+                return;
+            }
 
-        confetti({
-            particleCount: 100,
-            angle: 60,
-            spread: 70,
-            origin: { x: 0.3 },
-            colors: ['#C0C0C0', '#E8E8E8', '#A9A9A9', '#FFD700']
-        });
-        confetti({
-            particleCount: 100,
-            angle: 120,
-            spread: 70,
-            origin: { x: 0.7 },
-            colors: ['#C0C0C0', '#E8E8E8', '#A9A9A9', '#FFD700']
-        });
+            confetti({
+                particleCount: 100,
+                angle: 60,
+                spread: 70,
+                origin: { x: 0.3 },
+                colors: ['#C0C0C0', '#E8E8E8', '#A9A9A9', '#FFD700']
+            });
+            confetti({
+                particleCount: 100,
+                angle: 120,
+                spread: 70,
+                origin: { x: 0.7 },
+                colors: ['#C0C0C0', '#E8E8E8', '#A9A9A9', '#FFD700']
+            });
+        } catch(e) {
+            console.error('[confettiMedium] Error:', e);
+            clearInterval(interval);
+            confettiIntervals = confettiIntervals.filter(id => id !== interval);
+        }
     }, 250);
+    confettiIntervals.push(interval);
 }
 
 function confettiBig(winnerName) {
@@ -99,31 +108,46 @@ function confettiBig(winnerName) {
     }
 
     const interval = setInterval(() => {
-        const timeLeft = animationEnd - Date.now();
+        try {
+            const timeLeft = animationEnd - Date.now();
 
-        if (timeLeft <= 0) {
-            return clearInterval(interval);
+            if (timeLeft <= 0) {
+                clearInterval(interval);
+                confettiIntervals = confettiIntervals.filter(id => id !== interval);
+                return;
+            }
+
+            const particleCount = 100 * (timeLeft / duration); // Plus de particules
+
+            // Explosions depuis plusieurs points pour plus de densité
+            confetti(Object.assign({}, defaults, {
+                particleCount,
+                origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+                colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
+            }));
+            confetti(Object.assign({}, defaults, {
+                particleCount,
+                origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+                colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
+            }));
+            confetti(Object.assign({}, defaults, {
+                particleCount: particleCount * 0.5,
+                origin: { x: 0.5, y: 0.5 },
+                colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
+            }));
+        } catch(e) {
+            console.error('[confettiBig] Error:', e);
+            clearInterval(interval);
+            confettiIntervals = confettiIntervals.filter(id => id !== interval);
         }
-
-        const particleCount = 100 * (timeLeft / duration); // Plus de particules
-
-        // Explosions depuis plusieurs points pour plus de densité
-        confetti(Object.assign({}, defaults, {
-            particleCount,
-            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
-            colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
-        }));
-        confetti(Object.assign({}, defaults, {
-            particleCount,
-            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
-            colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
-        }));
-        confetti(Object.assign({}, defaults, {
-            particleCount: particleCount * 0.5,
-            origin: { x: 0.5, y: 0.5 },
-            colors: ['#FFD700', '#FFA500', '#FF4500', '#FFD700', '#FFFF00', '#FF6347']
-        }));
     }, 200); // Intervalle réduit pour plus de continuité
+    confettiIntervals.push(interval);
+}
+
+// Fonction pour nettoyer tous les confetti intervals (évite les fuites mémoire)
+function clearAllConfetti() {
+    confettiIntervals.forEach(interval => clearInterval(interval));
+    confettiIntervals = [];
 }
 
 function showWinner(name) {
@@ -142,6 +166,9 @@ function showWinner(name) {
 
     overlay.onclick = closeOverlay;
     overlay.ontouchstart = closeOverlay;
+
+    // Auto-close après 10 secondes
+    setTimeout(closeOverlay, 10000);
 }
 
 function triggerAlert() {
@@ -176,12 +203,32 @@ function toggleMultiTableInput() {
     inputGroup.style.display = toggle.checked ? 'block' : 'none';
 }
 
+
 function toggleBountyInput() {
     const toggle = document.getElementById('in-bounty-toggle');
     const inputGroup = document.getElementById('bounty-input-group');
+    const pkoSwitchGroup = document.getElementById('pko-switch-group');
+    inputGroup.style.display = toggle.checked ? 'block' : 'none';
+    pkoSwitchGroup.style.display = toggle.checked ? 'flex' : 'none';
+    
+    // Si on désactive bounty, désactiver aussi PKO
+    if (!toggle.checked) {
+        document.getElementById('in-pko-toggle').checked = false;
+        togglePKOInput();
+    }
+}
+
+function togglePKOInput() {
+    const toggle = document.getElementById('in-pko-toggle');
+    const inputGroup = document.getElementById('pko-input-group');
     inputGroup.style.display = toggle.checked ? 'block' : 'none';
 }
 
+function updatePKOLabel() {
+    const slider = document.getElementById('in-pko-slider');
+    const label = document.getElementById('pko-value-label');
+    label.textContent = slider.value + '%';
+}
 function toggleAntesStruct() {
     const chk = document.getElementById('in-antes-toggle');
     const txt = document.getElementById('in-blinds');
@@ -197,6 +244,12 @@ function toggleAntesStruct() {
             if(blindsPart.endsWith('/')) blindsPart = blindsPart.slice(0, -1);
             pausePart = cleanLine.substring(pIdx);
         }
+
+        // BUG-016 FIX: Si la ligne ne contient que PAUSE, la retourner sans modification
+        if (!blindsPart.trim()) {
+            return pausePart || "";
+        }
+
         let parts = blindsPart.split('/');
         if(parts.length >= 2) {
             const sb = parts[0];
@@ -213,23 +266,75 @@ function toggleAntesStruct() {
 
 function applySettings() {
     state.name = document.getElementById('in-name').value || "NUTZ POKER";
-    state.buyin = parseInt(document.getElementById('in-buy').value) || 0;
-    state.rebuyPrice = parseInt(document.getElementById('in-rebuy').value) || state.buyin;
+    // BUG-014 FIX: Empêcher les valeurs négatives avec Math.max(0, ...)
+    state.buyin = Math.max(0, parseInt(document.getElementById('in-buy').value) || 0);
+    state.rebuyPrice = Math.max(0, parseInt(document.getElementById('in-rebuy').value) || state.buyin);
 
     // Multi-tables : vérifier le toggle
     const multiTableEnabled = document.getElementById('in-multitable-toggle').checked;
-    state.tableSize = multiTableEnabled ? (parseInt(document.getElementById('in-table-size').value) || 0) : 0;
+    state.tableSize = multiTableEnabled ? Math.max(0, parseInt(document.getElementById('in-table-size').value) || 0) : 0;
 
     state.bountyEnabled = document.getElementById('in-bounty-toggle').checked;
-    state.bountyAmount = parseInt(document.getElementById('in-bounty-amount').value) || 0;
-    state.duration = parseInt(document.getElementById('in-dur').value) || 15;
+    state.bountyAmount = Math.max(0, parseInt(document.getElementById('in-bounty-amount').value) || 0);
+    state.pkoEnabled = document.getElementById('in-pko-toggle').checked;
+    state.pkoKillerShare = Math.max(0, Math.min(100, parseInt(document.getElementById('in-pko-slider').value) || 50));
+
+    // Validation: bounty ne peut pas dépasser le buy-in ou rebuy
+    if (state.bountyEnabled) {
+        if (state.bountyAmount > state.buyin) {
+            showToast('⚠️ Bounty invalide', `Le bounty (${state.bountyAmount}€) ne peut pas dépasser le buy-in (${state.buyin}€)`, 5000);
+            state.bountyAmount = state.buyin;
+        }
+        if (state.bountyAmount > state.rebuyPrice) {
+            showToast('⚠️ Bounty invalide', `Le bounty (${state.bountyAmount}€) ne peut pas dépasser le rebuy (${state.rebuyPrice}€)`, 5000);
+            state.bountyAmount = Math.min(state.bountyAmount, state.rebuyPrice);
+        }
+    }
+
+    state.duration = Math.max(1, parseInt(document.getElementById('in-dur').value) || 15); // Minimum 1 minute
     state.paidMode = document.getElementById('in-paid-select').value;
     state.customPaidStr = document.getElementById('in-paid-custom-str').value;
 
     // Structure des blinds avec valeur par défaut
     const blindsValue = document.getElementById('in-blinds').value.trim();
     if (blindsValue) {
-        state.structure = blindsValue.split('\n').filter(l => l.trim());
+        const rawStructure = blindsValue.split('\n').filter(l => l.trim());
+
+        // MINOR-02 FIX: Valider le format de chaque ligne
+        const invalidLines = [];
+        rawStructure.forEach((line, index) => {
+            const trimmed = line.trim();
+            if (trimmed) {
+                // Vérifier si c'est une pause
+                if (trimmed.toUpperCase().includes('PAUSE')) {
+                    return; // PAUSE est valide
+                }
+
+                // Vérifier si c'est un format de blinds valide (nombre/nombre ou nombre/nombre/nombre)
+                const parts = trimmed.split('/');
+                if (parts.length < 2 || parts.length > 3) {
+                    invalidLines.push(`Ligne ${index + 1}: "${trimmed}"`);
+                    return;
+                }
+
+                // Vérifier que chaque partie est un nombre
+                const hasInvalidNumber = parts.some(p => isNaN(parseInt(p.trim())));
+                if (hasInvalidNumber) {
+                    invalidLines.push(`Ligne ${index + 1}: "${trimmed}"`);
+                }
+            }
+        });
+
+        if (invalidLines.length > 0) {
+            showToast(
+                '⚠️ Structure invalide',
+                `Format attendu: SB/BB ou SB/BB/ANTE ou PAUSE XX<br><br>Lignes invalides:<br>${invalidLines.slice(0, 3).join('<br>')}${invalidLines.length > 3 ? '<br>...' : ''}`,
+                8000
+            );
+            return; // Ne pas appliquer les settings
+        }
+
+        state.structure = rawStructure;
     } else {
         // Structure par défaut si le champ est vide
         state.structure = [
@@ -252,7 +357,7 @@ function applySettings() {
     }
 
     if (state.mode === 'qty') {
-        let count = parseInt(document.getElementById('in-qty').value) || 0;
+        let count = Math.max(0, parseInt(document.getElementById('in-qty').value) || 0);
         if(state.players.length !== count) {
              state.players = Array.from({length: count}, (_, i) => ({ name: `Joueur ${i+1}`, out: false, rank: null, rebuys: 0, table: null, bounties: 0 }));
         } else {
@@ -264,7 +369,14 @@ function applySettings() {
             });
         }
     } else {
-        state.players = document.getElementById('in-players').value.split(/[\n,;]+/).map(n => ({name: n.trim(), out: false, rank: null, rebuys: 0, table: null, bounties: 0})).filter(p => p.name);
+        // BUG-026 FIX: Split seulement sur \n pour permettre les noms avec virgules
+        state.players = document.getElementById('in-players').value.split(/\n+/).map(n => ({name: n.trim(), out: false, rank: null, rebuys: 0, table: null, bounties: 0})).filter(p => p.name);
+    }
+
+    // BUG-015 FIX: Vérifier qu'il y a au moins 1 joueur
+    if (state.players.length === 0) {
+        showToast('⚠️ Aucun joueur', 'Vous devez ajouter au moins 1 joueur pour démarrer le tournoi', 5000);
+        return;
     }
 
     // Assigner les tables si multi-tables activé
@@ -277,6 +389,11 @@ function applySettings() {
 }
 
 function getPayouts() {
+    // Edge cases
+    if (state.players.length === 0) return [];
+    const activePlayers = state.players.filter(p => !p.out);
+    if (activePlayers.length === 0) return [];
+
     // Calcul du pot : buy-ins + rebuys
     // Si bounty activé, retirer la partie bounty du prize pool
     const buyinPrizePool = state.bountyEnabled ? (state.buyin - state.bountyAmount) : state.buyin;
@@ -302,6 +419,7 @@ function getPayouts() {
             nPaid = parseInt(state.paidMode);
         }
         if(nPaid > state.players.length) nPaid = state.players.length;
+        if(nPaid === 0) nPaid = 1; // Au moins 1 place payée
 
         if(nPaid === 1) weights = [100];
         else if(nPaid === 2) weights = [65, 35];
@@ -313,6 +431,9 @@ function getPayouts() {
     }
 
     const totalWeight = weights.reduce((a,b) => a+b, 0);
+
+    // Protection contre division par zéro (répartition invalide)
+    if (totalWeight === 0) return [];
 
     // Si le pot est petit (<100€), on arrondit à 1€ près. Sinon à 5€.
     let step = (pot < 100) ? 1 : 5;
@@ -329,10 +450,21 @@ function getPayouts() {
         else {
             // On retire le trop perçu au dernier, puis avant-dernier, etc.
             let idx = payouts.length - 1;
-            while(diff < 0) {
+            let iterations = 0;
+            const maxIterations = 1000; // Limite de sécurité
+            while(diff < 0 && idx >= 0 && iterations < maxIterations) {
+                 iterations++;
                  payouts[idx] -= step;
                  diff += step;
-                 if(payouts[idx] < step) { payouts[idx] = step; diff -= step; idx--; if(idx<0) idx=0; } // Safety
+                 if(payouts[idx] < step) {
+                     payouts[idx] = step;
+                     diff -= step;
+                     idx--;
+                 }
+            }
+            // Si on ne peut toujours pas répartir, ajuster le premier
+            if(diff < 0) {
+                payouts[0] = Math.max(step, payouts[0] + diff);
             }
         }
     }
@@ -382,7 +514,8 @@ function render() {
     document.getElementById('ui-next').innerText = "Suivant: " + nextText;
     document.getElementById('ui-pause-notif').style.display = state.isPause ? "block" : "none";
 
-    const listUI = document.getElementById('ui-player-list'); listUI.innerHTML = "";
+    const listUI = document.getElementById('ui-player-list');
+    const fragment = document.createDocumentFragment();
 
     // Trier les joueurs : actifs d'abord (par table si multi-tables), puis éliminés
     const sortedPlayers = [...state.players].sort((a, b) => {
@@ -404,23 +537,39 @@ function render() {
         const rebuyBadge = (p.rebuys || 0) > 0 ? `<span class="rebuy-badge">+${p.rebuys}</span>` : '';
 
         // Badge bounty (si bounty activé et joueur a des bounties)
-        const bountyBadge = (state.bountyEnabled && (p.bounties || 0) > 0)
-            ? `<span class="bounty-badge">🎯${p.bounties}</span>`
-            : '';
+        let bountyBadge = '';
+        if (state.bountyEnabled) {
+            if (state.pkoEnabled) {
+                // Mode PKO : afficher les deux valeurs séparées
+                const earned = p.bountiesEarned || 0;
+                const onHead = p.bountiesOnHead || 0;
+                if (earned > 0 || onHead > 0) {
+                    bountyBadge = `<span class="bounty-badge" title="Gagné: ${earned}€ | Sur la tête: ${onHead}€">💵${earned}€ 🎯${onHead}€</span>`;
+                }
+            } else {
+                // Mode classique : afficher le nombre
+                if ((p.bounties || 0) > 0) {
+                    bountyBadge = `<span class="bounty-badge">🎯${p.bounties}</span>`;
+                }
+            }
+        }
 
         // Afficher séparateur de table si nécessaire
         if (state.tableSize > 0 && !p.out && p.table !== currentTable) {
             if (currentTable !== null) {
-                // Pas de séparateur avant la première table
-                listUI.innerHTML += `<div class="table-separator"></div>`;
+                const separator = document.createElement('div');
+                separator.className = 'table-separator';
+                fragment.appendChild(separator);
             }
             // Compter les joueurs de cette table
             const tablePlayerCount = sortedPlayers.filter(pl => !pl.out && pl.table === p.table).length;
-            listUI.innerHTML += `
-                <div class="table-header">
-                    <span class="table-header-text">Table ${p.table}</span>
-                    <span class="table-header-count">${tablePlayerCount} joueur${tablePlayerCount > 1 ? 's' : ''}</span>
-                </div>`;
+
+            const tableHeader = document.createElement('div');
+            tableHeader.className = 'table-header';
+            tableHeader.innerHTML = `
+                <span class="table-header-text">Table ${p.table}</span>
+                <span class="table-header-count">${tablePlayerCount} joueur${tablePlayerCount > 1 ? 's' : ''}</span>`;
+            fragment.appendChild(tableHeader);
             currentTable = p.table;
         }
 
@@ -429,12 +578,17 @@ function render() {
             ? `<span class="eliminate-btn" onclick="event.stopPropagation(); toggleOut(${idx});" title="Éliminer">✕</span>`
             : '';
 
-        listUI.innerHTML += `
-            <div class="player-row ${p.out ? 'out' : ''}" onclick="showPlayerMenu(event, ${idx})">
-                <span>${p.name} ${rebuyBadge} ${bountyBadge} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span>
-                <span>${p.out ? 'OUT' : eliminateBtn}</span>
-            </div>`;
+        const playerRow = document.createElement('div');
+        playerRow.className = `player-row ${p.out ? 'out' : ''}`;
+        playerRow.onclick = (e) => showPlayerMenu(e, idx);
+        playerRow.innerHTML = `
+            <span>${p.name} ${rebuyBadge} ${bountyBadge} ${p.rank ? `<span class="rank-tag">${p.rank}e</span>` : ''}</span>
+            <span>${p.out ? 'OUT' : eliminateBtn}</span>`;
+        fragment.appendChild(playerRow);
     });
+
+    listUI.innerHTML = "";
+    listUI.appendChild(fragment);
     document.getElementById('ui-count').innerText = state.players.filter(p => !p.out).length + '/' + state.players.length;
 
     // Calcul du pot total avec rebuys
@@ -447,13 +601,23 @@ function render() {
         const buyinPrizePool = state.buyin - state.bountyAmount;
         const rebuyPrizePool = state.rebuyPrice - state.bountyAmount;
         const prizePoolTotal = state.players.length * buyinPrizePool + state.players.reduce((sum, p) => sum + (p.rebuys || 0) * rebuyPrizePool, 0);
-        document.getElementById('ui-total-pot').innerText = prizePoolTotal + ' + ' + (grandTotal - prizePoolTotal) + ' bounty';
+        const bountyTotal = grandTotal - prizePoolTotal;
+        document.getElementById('ui-total-pot').innerText = prizePoolTotal + '€ prix + ' + bountyTotal + '€ bounties';
     } else {
         document.getElementById('ui-total-pot').innerText = grandTotal;
     }
 
-    const payUI = document.getElementById('ui-payouts'); payUI.innerHTML = "";
-    getPayouts().forEach(p => payUI.innerHTML += `<div class="row" style="cursor:default"><span>${p.label}</span><span>${p.val}€</span></div>`);
+    const payUI = document.getElementById('ui-payouts');
+    const payoutFragment = document.createDocumentFragment();
+    getPayouts().forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.style.cursor = 'default';
+        row.innerHTML = `<span>${p.label}</span><span>${p.val}€</span>`;
+        payoutFragment.appendChild(row);
+    });
+    payUI.innerHTML = "";
+    payUI.appendChild(payoutFragment);
 
     const playBtn = document.getElementById('play-btn');
     playBtn.innerText = state.playing ? "PAUSE" : "DÉMARRER";
@@ -464,27 +628,58 @@ function render() {
         '<svg viewBox="0 0 24 24"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>' :
         '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
 
-    const muteIcon = document.getElementById('mute-icon');
-    if (state.muted) {
-        muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>';
-        muteIcon.style.opacity = "0.5";
-    } else {
-        muteIcon.innerHTML = '<svg viewBox="0 0 24 24"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path></svg>';
-        muteIcon.style.opacity = "1";
-    }
+    // Désactiver le bouton précédent si on est au niveau 0
+    const prevBtn = document.getElementById('prev-level-btn');
+    const nextBtn = document.getElementById('next-level-btn');
+    if (prevBtn) prevBtn.disabled = state.level === 0;
+    if (nextBtn) nextBtn.disabled = state.level >= state.structure.length;
+}
+
+// Update rapide du timer sans re-render complet
+function updateTimer() {
+    const m = Math.floor(state.timeLeft / 60);
+    const s = state.timeLeft % 60;
+    document.getElementById('timer').innerText = `${m}:${s < 10 ? '0'+s : s}`;
 }
 
 function toggleTimer() {
+    // Protection contre les clics multiples rapides
+    if (isToggling) return;
+    isToggling = true;
+
     unlockAudio();
-    if(state.playing) { clearInterval(clock); state.playing = false; }
-    else { state.playing = true; clock = setInterval(() => { state.timeLeft--; if(state.timeLeft < 0) handleLevelEnd(); render(); }, 1000); }
+
+    // TOUJOURS nettoyer l'interval existant d'abord (évite les race conditions)
+    if (clock) {
+        clearInterval(clock);
+        clock = null;
+    }
+
+    if(state.playing) {
+        // Arrêter le timer
+        state.playing = false;
+    } else {
+        // Démarrer le timer
+        state.playing = true;
+        clock = setInterval(() => {
+            state.timeLeft--;
+            if(state.timeLeft < 0) handleLevelEnd();
+            else updateTimer();
+        }, 1000);
+    }
     render();
+
+    // Réactiver après un court délai
+    setTimeout(() => { isToggling = false; }, 100);
 }
 
 // --- GÉNÉRATION AUTOMATIQUE DES BLINDS ---
 let lastGenerationLevel = -1; // Pour éviter de générer plusieurs fois
 
 function generateNextBlinds() {
+    // BUG-021 FIX: Vérifier que structure existe
+    if (!state.structure || !Array.isArray(state.structure)) return;
+
     // Éviter de générer plusieurs fois pour le même niveau
     if (lastGenerationLevel === state.level) return;
     lastGenerationLevel = state.level;
@@ -492,7 +687,8 @@ function generateNextBlinds() {
     // Filtrer les niveaux de blinds (sans les pauses)
     const blindLevels = state.structure.filter(l => !l.toUpperCase().includes('PAUSE'));
 
-    if (blindLevels.length < 2) return; // Pas assez de données pour détecter un pattern
+    // Protection: s'assurer qu'il y a au moins 2 niveaux pour détecter un pattern
+    if (blindLevels.length === 0 || blindLevels.length < 2) return;
 
     // Analyser les derniers niveaux pour détecter le pattern
     const lastLevel = blindLevels[blindLevels.length - 1];
@@ -500,7 +696,11 @@ function generateNextBlinds() {
 
     // Parser le dernier niveau
     const parseBlinds = (str) => {
-        const parts = str.split('/').map(p => parseInt(p.trim()));
+        // BUG-019 FIX: Valider que parseInt() ne retourne pas NaN
+        const parts = str.split('/').map(p => {
+            const val = parseInt(p.trim());
+            return isNaN(val) ? 0 : val;
+        });
         return {
             sb: parts[0] || 0,
             bb: parts[1] || 0,
@@ -559,10 +759,31 @@ function generateNextBlinds() {
 }
 
 function handleLevelEnd() {
+    // BUG-021 FIX: Vérifier que structure existe
+    if (!state.structure || !Array.isArray(state.structure) || state.structure.length === 0) {
+        clearInterval(clock);
+        state.playing = false;
+        render();
+        return;
+    }
+
     triggerAlert();
+
+    // Protection: si on a dépassé la structure, arrêter le timer
+    if (state.level >= state.structure.length) {
+        clearInterval(clock);
+        state.playing = false;
+        render();
+        return;
+    }
+
     const line = state.structure[state.level] || "";
     if(!state.isPause && line.toUpperCase().includes("PAUSE")) {
-        state.isPause = true; state.timeLeft = (parseInt(line.toUpperCase().split("PAUSE")[1]) || 5) * 60;
+        state.isPause = true;
+        // Parser la durée avec regex (plus robuste)
+        const pauseMatch = line.toUpperCase().match(/PAUSE\s*(\d+)/);
+        const pauseDuration = pauseMatch ? parseInt(pauseMatch[1]) : 5;
+        state.timeLeft = pauseDuration * 60;
     } else {
         state.isPause = false; state.level++; state.timeLeft = state.duration * 60;
 
@@ -573,10 +794,23 @@ function handleLevelEnd() {
 
         if(state.level >= state.structure.length) { clearInterval(clock); state.playing = false; }
     }
+    render();
 }
 function changeLvl(dir) {
+    // BUG-021 FIX: Vérifier que structure existe
+    if (!state.structure || !Array.isArray(state.structure) || state.structure.length === 0) {
+        return;
+    }
+
     unlockAudio();
     state.level = Math.max(0, Math.min(state.structure.length - 1, state.level + dir));
+
+    // BUG-012 FIX: Réinitialiser le flag de génération lors d'un changement manuel
+    // pour permettre la génération si on revient à ce niveau plus tard
+    if (dir !== 0) {
+        lastGenerationLevel = -1;
+    }
+
     if(dir > 0) {
         triggerAlert();
 
@@ -595,10 +829,20 @@ function showToast(title, content, duration = 8000) {
     const toastTitle = document.getElementById('toast-title');
     const toastContent = document.getElementById('toast-content');
 
-    toastTitle.textContent = title;
-    toastContent.innerHTML = content + '<div class="toast-dismiss-hint">Cliquez pour fermer</div>';
-
-    toast.classList.add('show');
+    // BUG-022 FIX: Si une toast est déjà visible, la retirer brièvement pour réinitialiser l'animation
+    if (toast.classList.contains('show')) {
+        toast.classList.remove('show');
+        // Petit délai pour forcer le reflow et redéclencher l'animation
+        setTimeout(() => {
+            toastTitle.textContent = title;
+            toastContent.innerHTML = content + '<div class="toast-dismiss-hint">Cliquez pour fermer</div>';
+            toast.classList.add('show');
+        }, 50);
+    } else {
+        toastTitle.textContent = title;
+        toastContent.innerHTML = content + '<div class="toast-dismiss-hint">Cliquez pour fermer</div>';
+        toast.classList.add('show');
+    }
 
     // Fermer au clic
     toast.onclick = () => {
@@ -625,10 +869,14 @@ function assignTables() {
 
     if (activePlayers.length === 0) return;
 
+    // Vérifier si des tables sont déjà assignées (ne pas ré-assigner si déjà fait)
+    const hasExistingTables = activePlayers.some(p => p.table !== null && p.table !== undefined);
+    if (hasExistingTables) return; // Les tables sont déjà assignées, ne pas re-mélanger
+
     // Calculer le nombre de tables nécessaires
     const numTables = Math.ceil(activePlayers.length / state.tableSize);
 
-    // Mélanger les joueurs actifs aléatoirement
+    // Mélanger les joueurs actifs aléatoirement (seulement à la première assignation)
     const shuffled = [...activePlayers].sort(() => Math.random() - 0.5);
 
     // Assigner les tables de manière équilibrée
@@ -704,6 +952,7 @@ function rebalanceTables() {
 
     // Algorithme de déplacement minimal
     const changes = [];
+    const movedPlayers = new Set(); // BUG-013 FIX: Suivre les joueurs déjà déplacés
 
     // Boucle jusqu'à équilibre (avec limite de sécurité)
     let iterations = 0;
@@ -733,21 +982,39 @@ function rebalanceTables() {
 
         // Si on a trouvé une source et une cible, déplacer un joueur
         if (sourceTable && targetTable) {
-            const player = tableGroups[sourceTable].pop();
-            player.table = targetTable;
-            tableGroups[targetTable].push(player);
+            // BUG-013 FIX: Trouver un joueur qui n'a pas encore été déplacé
+            const availablePlayers = tableGroups[sourceTable].filter(p => !movedPlayers.has(p.name));
 
-            if (oldTables[player.name] !== player.table) {
-                changes.push({ name: player.name, from: oldTables[player.name], to: player.table });
+            if (availablePlayers.length > 0) {
+                // Déplacer le dernier joueur non-encore-déplacé
+                const player = availablePlayers[availablePlayers.length - 1];
+
+                // Retirer le joueur de la table source
+                const indexInSource = tableGroups[sourceTable].indexOf(player);
+                tableGroups[sourceTable].splice(indexInSource, 1);
+
+                // Ajouter à la table cible
+                player.table = targetTable;
+                tableGroups[targetTable].push(player);
+                movedPlayers.add(player.name);
+
+                if (oldTables[player.name] !== player.table) {
+                    changes.push({ name: player.name, from: oldTables[player.name], to: player.table });
+                }
+
+                needsRebalance = true;
             }
-
-            needsRebalance = true;
         }
 
         // Si aucun déplacement nécessaire, on arrête
         if (!needsRebalance) {
             break;
         }
+    }
+
+    // Log si on a atteint la limite (debug)
+    if (iterations >= maxIterations) {
+        console.warn('[rebalanceTables] Limite d\'itérations atteinte, l\'équilibre parfait n\'a peut-être pas été atteint');
     }
 
     // Afficher les changements
@@ -859,6 +1126,14 @@ function editPlayerName(i) {
 function addRebuy(i) {
     const player = state.players[i];
     if(player.rebuys === undefined) player.rebuys = 0;
+
+    // BUG-018 FIX: Limite de 10 rebuys par joueur
+    const MAX_REBUYS = 10;
+    if (player.rebuys >= MAX_REBUYS) {
+        showToast('⚠️ Limite atteinte', `Le joueur ${player.name} a déjà atteint la limite de ${MAX_REBUYS} rebuys`, 3000);
+        return;
+    }
+
     player.rebuys++;
     save();
     render();
@@ -875,13 +1150,14 @@ function removeRebuy(i) {
 
 function changePlayerTable(i) {
     if (!state.tableSize || state.tableSize <= 0) {
-        alert("Le mode multi-tables n'est pas activé.");
+        // MINOR-04 FIX: Utiliser toast au lieu d'alert
+        showToast('⚠️ Multi-tables désactivé', "Le mode multi-tables n'est pas activé.", 3000);
         return;
     }
 
     const player = state.players[i];
     if (player.out) {
-        alert("Impossible de changer la table d'un joueur éliminé.");
+        showToast('⚠️ Joueur éliminé', "Impossible de changer la table d'un joueur éliminé.", 3000);
         return;
     }
 
@@ -897,11 +1173,15 @@ function changePlayerTable(i) {
             if (tableNum !== oldTable) {
                 player.table = tableNum;
                 showToast(`✋ Changement manuel`, `<span class="player-change">${player.name}</span> : T${oldTable} → T${tableNum}`, 6000);
+
+                // BUG-025 FIX: Rééquilibrer les tables après un changement manuel
+                rebalanceTables();
+
                 save();
                 render();
             }
         } else {
-            alert(`Numéro de table invalide. Doit être entre 1 et ${numTables}.`);
+            showToast('⚠️ Table invalide', `Numéro de table invalide. Doit être entre 1 et ${numTables}.`, 3000);
         }
     }
 }
@@ -910,6 +1190,8 @@ function changePlayerTable(i) {
 let bountyModalData = { eliminatedPlayerIndex: -1, eliminatedPlayerTable: null };
 
 function showBountyModal(eliminatedPlayerIndex, eliminatedPlayerTable) {
+    bountyModalOpen = true; // Empêcher d'autres éliminations pendant la modal
+
     // Sauvegarder les données pour le filtrage
     bountyModalData = { eliminatedPlayerIndex, eliminatedPlayerTable };
 
@@ -935,7 +1217,7 @@ function showBountyModal(eliminatedPlayerIndex, eliminatedPlayerTable) {
 
 function renderBountyPlayers(searchQuery = '') {
     const { eliminatedPlayerIndex, eliminatedPlayerTable } = bountyModalData;
-    const activePlayers = state.players.filter(p => !p.out);
+    const activePlayers = state.players.filter((p, idx) => !p.out && idx !== eliminatedPlayerIndex);
 
     // Filtrer selon la recherche
     let filteredPlayers = activePlayers;
@@ -955,54 +1237,90 @@ function renderBountyPlayers(searchQuery = '') {
     // Section même table
     const sameTableSection = document.getElementById('bounty-same-table-section');
     const sameTableList = document.getElementById('bounty-same-table-list');
-    sameTableList.innerHTML = '';
+    const sameTableFragment = document.createDocumentFragment();
 
     if (sameTable.length > 0) {
         sameTableSection.style.display = 'block';
         sameTable.forEach(p => {
             const idx = state.players.indexOf(p);
             const playerNumber = idx + 1;
-            const bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+
+            // Affichage bounty adapté au mode
+            let bountyInfo = '';
+            if (state.pkoEnabled) {
+                const earned = p.bountiesEarned || 0;
+                const onHead = p.bountiesOnHead || 0;
+                if (earned > 0 || onHead > 0) {
+                    bountyInfo = `💵${earned}€ 🎯${onHead}€`;
+                }
+            } else {
+                bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+            }
+
             const tableInfo = state.tableSize > 0 ? `T${p.table}` : '';
 
-            sameTableList.innerHTML += `
-                <div class="bounty-player-card" onclick="assignBounty(${eliminatedPlayerIndex}, ${idx})" data-player-name="${p.name.toLowerCase()}" data-player-number="${playerNumber}">
-                    <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
-                    <div class="bounty-player-info">
-                        ${tableInfo ? `<span>${tableInfo}</span>` : ''}
-                        ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
-                    </div>
+            const card = document.createElement('div');
+            card.className = 'bounty-player-card';
+            card.onclick = () => assignBounty(eliminatedPlayerIndex, idx);
+            card.dataset.playerName = p.name.toLowerCase();
+            card.dataset.playerNumber = playerNumber;
+            card.innerHTML = `
+                <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
+                <div class="bounty-player-info">
+                    ${tableInfo ? `<span>${tableInfo}</span>` : ''}
+                    ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
                 </div>`;
+            sameTableFragment.appendChild(card);
         });
     } else {
         sameTableSection.style.display = 'none';
     }
+    sameTableList.innerHTML = '';
+    sameTableList.appendChild(sameTableFragment);
 
     // Section autres tables
     const otherTablesSection = document.getElementById('bounty-other-tables-section');
     const otherTablesList = document.getElementById('bounty-other-tables-list');
-    otherTablesList.innerHTML = '';
+    const otherTablesFragment = document.createDocumentFragment();
 
     if (otherTables.length > 0) {
         otherTablesSection.style.display = 'block';
         otherTables.forEach(p => {
             const idx = state.players.indexOf(p);
             const playerNumber = idx + 1;
-            const bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+
+            // Affichage bounty adapté au mode
+            let bountyInfo = '';
+            if (state.pkoEnabled) {
+                const earned = p.bountiesEarned || 0;
+                const onHead = p.bountiesOnHead || 0;
+                if (earned > 0 || onHead > 0) {
+                    bountyInfo = `💵${earned}€ 🎯${onHead}€`;
+                }
+            } else {
+                bountyInfo = (p.bounties || 0) > 0 ? `🎯${p.bounties}` : '';
+            }
+
             const tableInfo = state.tableSize > 0 ? `T${p.table}` : '';
 
-            otherTablesList.innerHTML += `
-                <div class="bounty-player-card" onclick="assignBounty(${eliminatedPlayerIndex}, ${idx})" data-player-name="${p.name.toLowerCase()}" data-player-number="${playerNumber}">
-                    <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
-                    <div class="bounty-player-info">
-                        ${tableInfo ? `<span>${tableInfo}</span>` : ''}
-                        ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
-                    </div>
+            const card = document.createElement('div');
+            card.className = 'bounty-player-card';
+            card.onclick = () => assignBounty(eliminatedPlayerIndex, idx);
+            card.dataset.playerName = p.name.toLowerCase();
+            card.dataset.playerNumber = playerNumber;
+            card.innerHTML = `
+                <div class="bounty-player-name">#${playerNumber} ${p.name}</div>
+                <div class="bounty-player-info">
+                    ${tableInfo ? `<span>${tableInfo}</span>` : ''}
+                    ${bountyInfo ? `<span>${bountyInfo}</span>` : ''}
                 </div>`;
+            otherTablesFragment.appendChild(card);
         });
     } else {
         otherTablesSection.style.display = 'none';
     }
+    otherTablesList.innerHTML = '';
+    otherTablesList.appendChild(otherTablesFragment);
 
     // Afficher message "Aucun résultat" si nécessaire
     const noResults = document.getElementById('bounty-no-results');
@@ -1016,13 +1334,27 @@ function renderBountyPlayers(searchQuery = '') {
 }
 
 function filterBountyPlayers() {
-    const searchQuery = document.getElementById('bounty-search').value;
+    // BUG-023 FIX: Trim la recherche pour éviter les espaces parasites
+    const searchQuery = document.getElementById('bounty-search').value.trim();
     renderBountyPlayers(searchQuery);
 }
 
 function closeBountyModal() {
+    bountyModalOpen = false; // Ré-autoriser les éliminations
+
     document.getElementById('bounty-modal').style.display = 'none';
     document.getElementById('bounty-search').value = '';
+
+    // Assigner le rank au joueur éliminé seulement s'il n'a pas déjà été assigné
+    const { eliminatedPlayerIndex } = bountyModalData;
+    if (eliminatedPlayerIndex !== undefined && eliminatedPlayerIndex >= 0) {
+        const eliminatedPlayer = state.players[eliminatedPlayerIndex];
+        if (eliminatedPlayer.rank === null || eliminatedPlayer.rank === undefined) {
+            const alive = state.players.filter(x => !x.out).length;
+            eliminatedPlayer.rank = alive;
+        }
+    }
+
     // Continuer le traitement de l'élimination sans bounty
     rebalanceTables();
     save();
@@ -1033,24 +1365,70 @@ function assignBounty(eliminatedPlayerIndex, killerPlayerIndex) {
     const eliminatedPlayer = state.players[eliminatedPlayerIndex];
     const killer = state.players[killerPlayerIndex];
 
-    // Calculer le nombre de bounties gagnés
-    const bountiesWon = 1 + (eliminatedPlayer.rebuys || 0);
-    if (!killer.bounties) killer.bounties = 0;
-    killer.bounties += bountiesWon;
+    // BUG-020 FIX: Assigner le rank seulement s'il n'a pas déjà été assigné
+    const alive = state.players.filter(x => !x.out).length;
+    if (eliminatedPlayer.rank === null || eliminatedPlayer.rank === undefined) {
+        eliminatedPlayer.rank = alive;
+    }
+
+    let killerEarnings = 0;
+    let killerHeadIncrease = 0;
+    let totalBountyValue = 0;
+
+    if (state.pkoEnabled) {
+        // MODE PKO : Progressive Knockout avec tracking séparé
+        // Initialiser les champs PKO si nécessaire
+        if (!killer.bountiesEarned) killer.bountiesEarned = 0;
+        if (!killer.bountiesOnHead) killer.bountiesOnHead = 0;
+        if (!eliminatedPlayer.bountiesEarned) eliminatedPlayer.bountiesEarned = 0;
+        if (!eliminatedPlayer.bountiesOnHead) eliminatedPlayer.bountiesOnHead = 0;
+
+        // Le bounty du joueur éliminé = son bounty initial + tout ce qu'il a accumulé sur sa tête
+        const initialBounty = (1 + (eliminatedPlayer.rebuys || 0)) * state.bountyAmount;
+        const accumulatedOnHead = eliminatedPlayer.bountiesOnHead; // Ce qui était sur sa tête
+        totalBountyValue = initialBounty + accumulatedOnHead;
+
+        // Répartir selon le pourcentage
+        killerEarnings = Math.floor(totalBountyValue * (state.pkoKillerShare / 100));
+        killerHeadIncrease = totalBountyValue - killerEarnings;
+
+        // Mettre à jour les valeurs du killer
+        killer.bountiesEarned += killerEarnings; // Cash gagné directement
+        killer.bountiesOnHead += killerHeadIncrease; // Ajouté sur sa tête
+
+        // Notif avec détails clairs
+        if (state.pkoKillerShare === 100) {
+            showToast(`💰 Bounty PKO`,
+                `<span class="player-change">${killer.name}</span> empoche ${killerEarnings}€<br>` +
+                `💵 Total gagné: ${killer.bountiesEarned}€`, 6000);
+        } else if (state.pkoKillerShare === 0) {
+            showToast(`💰 Bounty PKO`,
+                `<span class="player-change">${killer.name}</span> accumule +${killerHeadIncrease}€<br>` +
+                `🎯 Sur sa tête: ${killer.bountiesOnHead}€`, 6000);
+        } else {
+            showToast(`💰 Bounty PKO`,
+                `<span class="player-change">${killer.name}</span> élimine ${eliminatedPlayer.name}<br>` +
+                `💵 Gagne: ${killerEarnings}€ (total: ${killer.bountiesEarned}€)<br>` +
+                `🎯 Sur sa tête: +${killerHeadIncrease}€ (total: ${killer.bountiesOnHead}€)`, 8000);
+        }
+    } else {
+        // MODE BOUNTY CLASSIQUE : compter les bounties de base + ceux accumulés par l'éliminé
+        const bountiesWon = 1 + (eliminatedPlayer.rebuys || 0) + (eliminatedPlayer.bounties || 0);
+        killer.bounties += bountiesWon;
+        totalBountyValue = bountiesWon * state.bountyAmount;
+
+        showToast(`💰 Bounty`, `<span class="player-change">${killer.name}</span> gagne ${bountiesWon} bounty(s) (${totalBountyValue}€) pour avoir éliminé ${eliminatedPlayer.name}`, 6000);
+    }
 
     // Fermer la modal
     document.getElementById('bounty-modal').style.display = 'none';
     document.getElementById('bounty-search').value = '';
-
-    // Notification
-    const totalValue = bountiesWon * state.bountyAmount;
-    showToast(`💰 Bounty`, `<span class="player-change">${killer.name}</span> gagne ${bountiesWon} bounty(s) (${totalValue}€) pour avoir éliminé ${eliminatedPlayer.name}`, 6000);
+    bountyModalOpen = false; // Ré-autoriser les éliminations
 
     // Continuer le traitement de l'élimination
     rebalanceTables();
 
-    // Gérer les confetti si nécessaire
-    const alive = state.players.filter(x => !x.out).length;
+    // Gérer les confetti si nécessaire (alive est déjà calculé plus haut)
     if (alive === 1) {
         // Cas spécial du heads-up
         const nbPaidPlaces = getPayouts().length;
@@ -1060,6 +1438,21 @@ function assignBounty(eliminatedPlayerIndex, killerPlayerIndex) {
         setTimeout(() => {
             const winner = state.players.find(x => !x.out);
             winner.rank = 1;
+
+            // En mode PKO, le gagnant récupère aussi son propre bounty
+            if (state.pkoEnabled) {
+                const onHead = winner.bountiesOnHead || 0;
+                if (onHead > 0) {
+                    // Le gagnant récupère ce qui était sur sa tête
+                    if (!winner.bountiesEarned) winner.bountiesEarned = 0;
+                    winner.bountiesEarned += onHead;
+                    winner.finalPKOBonus = onHead;
+                    showToast(`🏆 Victoire PKO`,
+                        `<span class="player-change">${winner.name}</span> récupère son bounty !<br>` +
+                        `💵 +${onHead}€ (total gagné: ${winner.bountiesEarned}€)`, 7000);
+                }
+            }
+            
             confettiBig(winner.name);
         }, 800);
     } else {
@@ -1079,16 +1472,30 @@ function assignBounty(eliminatedPlayerIndex, killerPlayerIndex) {
 }
 
 function toggleOut(i) {
+    // Empêcher éliminations multiples pendant qu'une bounty modal est ouverte
+    if (bountyModalOpen) {
+        showToast('⚠️ Attendez', 'Sélectionnez d\'abord le killer du joueur précédent', 3000);
+        return;
+    }
+
     const p = state.players[i];
     if(!p.out) {
-        const alive = state.players.filter(x => !x.out).length;
+        // Calculer alive AVANT l'élimination
+        const aliveBefore = state.players.filter(x => !x.out).length;
+
+        // Éliminer le joueur
         p.out = true;
-        p.rank = alive;
+
+        // Calculer alive APRÈS l'élimination
+        const aliveAfter = aliveBefore - 1;
+        p.rank = aliveAfter;
+
         const eliminatedPlayerTable = p.table;
         p.table = null; // Retirer de la table
 
-        // Si bounty activé, ouvrir la modal de sélection
-        if (state.bountyEnabled && alive > 1) {
+        // Si bounty activé ET qu'il reste au moins 1 joueur, ouvrir la modal de sélection
+        // (si aliveAfter === 0, c'est le dernier joueur, pas de bounty à assigner)
+        if (state.bountyEnabled && aliveAfter >= 1) {
             showBountyModal(i, eliminatedPlayerTable);
             return; // On sort de la fonction, rebalanceTables() sera appelé après sélection
         }
@@ -1096,8 +1503,8 @@ function toggleOut(i) {
         // Rééquilibrer les tables après élimination
         rebalanceTables();
 
-        // Cas spécial : élimination de l'avant-dernier joueur (il reste 2 vivants)
-        if(alive === 2) {
+        // Cas spécial : élimination de l'avant-dernier joueur (aliveBefore était 2)
+        if(aliveBefore === 2) {
             // Le joueur éliminé est 2e place
             p.rank = 2;
 
@@ -1105,6 +1512,19 @@ function toggleOut(i) {
             const winner = state.players.find(x => !x.out);
             if(winner) {
                 winner.rank = 1;
+
+            // En mode PKO, le gagnant récupère aussi son propre bounty
+            if (state.pkoEnabled) {
+                const onHead = winner.bountiesOnHead || 0;
+                if (onHead > 0) {
+                    // Le gagnant récupère ce qui était sur sa tête
+                    if (!winner.bountiesEarned) winner.bountiesEarned = 0;
+                    winner.bountiesEarned += onHead;
+                    showToast(`🏆 Victoire PKO`,
+                        `<span class="player-change">${winner.name}</span> récupère son bounty !<br>` +
+                        `💵 +${onHead}€ (total gagné: ${winner.bountiesEarned}€)`, 7000);
+                }
+            }
             }
 
             // Déclencher les confetti pour les deux places
@@ -1134,6 +1554,12 @@ function toggleOut(i) {
         p.out = false;
         p.rank = null;
 
+        // En mode PKO, reset les bounties accumulés (il repart de zéro)
+        if (state.pkoEnabled) {
+            p.bountiesEarned = 0;
+            p.bountiesOnHead = 0;
+        }
+
         // Réassigner à une table
         rebalanceTables();
 
@@ -1147,39 +1573,60 @@ function toggleOut(i) {
     render();
 }
 function resetApp() {
-    if(confirm("Supprimer toutes les données et recommencer ?")) {
-        localStorage.removeItem('nutz_pro_v6');
-        // Réinitialiser les valeurs du formulaire avec les défauts
-        document.getElementById('in-name').value = 'NUTZ POKER';
-        document.getElementById('in-buy').value = '20';
-        document.getElementById('in-rebuy').value = '';
-        document.getElementById('in-multitable-toggle').checked = false;
-        document.getElementById('in-table-size').value = '';
-        document.getElementById('multitable-input-group').style.display = 'none';
-        document.getElementById('in-bounty-toggle').checked = false;
-        document.getElementById('in-bounty-amount').value = '';
-        document.getElementById('bounty-input-group').style.display = 'none';
-        document.getElementById('in-dur').value = '15';
-        document.getElementById('in-qty').value = '10';
-        document.getElementById('in-paid-select').value = 'auto';
-        document.getElementById('in-antes-toggle').checked = false;
-        document.getElementById('in-blinds').value = `25/50
-50/100
-75/150
-100/200
-200/400/200
-300/600/300
-400/800/400
-500/1000/500
-600/1200/600
-800/1600/800
-1000/2000/1000
-1500/3000/1500
-2000/4000/2000
-3000/6000/3000
-5000/10000/5000`;
-        // Appliquer les nouveaux réglages
-        applySettings();
+    // MINOR-03 FIX: Confirmation plus explicite
+    const message = "⚠️ RÉINITIALISATION DU TOURNOI\n\n" +
+                    "Cette action va:\n" +
+                    "• Remettre le timer au niveau 1\n" +
+                    "• Réactiver tous les joueurs éliminés\n" +
+                    "• Effacer tous les rebuys et bounties\n" +
+                    "• Réinitialiser le classement\n\n" +
+                    "Les paramètres (buy-in, structure, etc.) seront conservés.\n\n" +
+                    "Confirmer la réinitialisation ?";
+
+    if(confirm(message)) {
+        // Début de la réinitialisation du tournoi
+
+        // Arrêter le timer s'il tourne
+        if(state.playing) {
+            clearInterval(clock);
+            state.playing = false;
+        }
+
+        // Nettoyer tous les confetti intervals (évite les fuites mémoire)
+        clearAllConfetti();
+
+        // Remettre le tournoi au début
+        state.level = 0;
+        state.timeLeft = state.duration * 60;
+        state.isPause = false;
+
+        // Timer remis à zéro
+
+        // Réinitialiser tous les joueurs
+        const beforeReset = state.players.filter(p => p.out).length;
+        state.players.forEach(p => {
+            p.out = false;
+            p.rank = null;
+            p.rebuys = 0;
+            p.bounties = 0; // Mode classique
+            p.bountiesEarned = 0; // Mode PKO: cash gagné
+            p.bountiesOnHead = 0; // Mode PKO: sur la tête
+            p.table = null; // Réinitialiser l'assignation de table
+        });
+        const afterReset = state.players.filter(p => p.out).length;
+        // Joueurs réinitialisés
+
+        // Réassigner les tables si multi-table activé
+        if(state.tableSize > 0) {
+            assignTables();
+            // Tables réassignées
+        }
+
+        // Sauvegarder et recharger la page pour garantir la mise à jour
+        save();
+        render(); // Mettre à jour l'affichage avant reload (évite timer négatif visible)
+        // État sauvegardé, rechargement de la page
+        location.reload();
     }
 }
 
@@ -1201,6 +1648,24 @@ function openSettings() {
     document.getElementById('in-bounty-amount').value = state.bountyAmount || '';
     document.getElementById('bounty-input-group').style.display = bountyEnabled ? 'block' : 'none';
 
+    // PKO - avec vérification d'existence
+    const pkoToggle = document.getElementById('in-pko-toggle');
+    const pkoSlider = document.getElementById('in-pko-slider');
+    const pkoSwitchGroup = document.getElementById('pko-switch-group');
+    const pkoInputGroup = document.getElementById('pko-input-group');
+    
+    if (pkoToggle && pkoSlider && pkoSwitchGroup && pkoInputGroup) {
+        const pkoEnabled = state.pkoEnabled || false;
+        pkoToggle.checked = pkoEnabled;
+        pkoSlider.value = state.pkoKillerShare || 50;
+        pkoSwitchGroup.style.display = bountyEnabled ? 'flex' : 'none';
+        pkoInputGroup.style.display = pkoEnabled ? 'block' : 'none';
+        updatePKOLabel();
+    } else {
+        // Log si éléments PKO manquants (debug)
+        console.warn('[openSettings] Éléments PKO manquants dans le DOM');
+    }
+
     document.getElementById('in-dur').value = state.duration;
     document.getElementById('in-blinds').value = state.structure.join('\n');
     const hasAnte = state.structure.some(l => {
@@ -1217,17 +1682,39 @@ function openSettings() {
     document.getElementById('modal').style.display = 'flex';
 }
 function closeSettings() { document.getElementById('modal').style.display = 'none'; }
-function save() { localStorage.setItem('nutz_pro_v6', JSON.stringify(state)); }
+function save() {
+    try {
+        localStorage.setItem('nutz_pro_v6', JSON.stringify(state));
+    } catch(e) {
+        console.error('[save] Impossible de sauvegarder:', e);
+        // Si quota dépassé, afficher un avertissement
+        if (e.name === 'QuotaExceededError') {
+            showToast('⚠️ Sauvegarde impossible', 'Stockage local plein. Videz le cache du navigateur.', 8000);
+        }
+    }
+}
 
 window.onload = () => {
     const saved = localStorage.getItem('nutz_pro_v6');
     if(saved) {
-        state = JSON.parse(saved); state.playing = false;
-        if(state.muted === undefined) state.muted = false;
+        // MINOR-05 FIX: Protection contre données corrompues
+        try {
+            state = JSON.parse(saved);
+            state.playing = false;
+        } catch(e) {
+            console.error('[load] Données corrompues, utilisation des paramètres par défaut:', e);
+            showToast('⚠️ Erreur de chargement', 'Les données sauvegardées sont corrompues. Paramètres par défaut utilisés.', 6000);
+            applySettings();
+            render();
+            return;
+        }
         if(state.rebuyPrice === undefined) state.rebuyPrice = state.buyin;
         if(state.tableSize === undefined) state.tableSize = 0;
         if(state.bountyEnabled === undefined) state.bountyEnabled = false;
         if(state.bountyAmount === undefined) state.bountyAmount = 0;
+        if(state.pkoEnabled === undefined) state.pkoEnabled = false;
+        if(state.pkoKillerShare === undefined) state.pkoKillerShare = 50;
+        if(state.mode === undefined) state.mode = 'qty';
         // S'assurer que la structure des blinds existe
         if(!state.structure || state.structure.length === 0) {
             state.structure = [
@@ -1258,4 +1745,28 @@ window.onload = () => {
     } else { applySettings(); }
     setMode('qty');
     render();
+
+    // MINOR FIX: Gestionnaire touche ESC pour fermer les modales
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            // Fermer la modal de settings si ouverte
+            const settingsModal = document.getElementById('modal');
+            if (settingsModal && settingsModal.style.display === 'flex') {
+                closeSettings();
+            }
+
+            // Fermer la modal de bounty si ouverte
+            const bountyModal = document.getElementById('bounty-modal');
+            if (bountyModal && bountyModal.style.display === 'flex') {
+                closeBountyModal();
+            }
+        }
+    });
+
+    // Enregistrement du Service Worker pour PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js')
+            .then(reg => console.log('[PWA] Service Worker enregistré', reg))
+            .catch(err => console.log('[PWA] Erreur Service Worker', err));
+    }
 };

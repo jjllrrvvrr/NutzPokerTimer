@@ -1,0 +1,19 @@
+{
+  "name": "nutz-poker-timer",
+  "version": "1.0.0",
+  "description": "Gestionnaire de tournoi de poker professionnel et stylé",
+  "scripts": {
+    "build": "node build.js",
+    "minify:js": "terser script.js -o dist/script.min.js --compress --mangle --comments false",
+    "minify:css": "csso style.css -o dist/style.min.css",
+    "minify:html": "html-minifier-terser --collapse-whitespace --remove-comments --minify-css true --minify-js true -o dist/index.html index.html"
+  },
+  "devDependencies": {
+    "terser": "^5.36.0",
+    "csso-cli": "^4.0.2",
+    "html-minifier-terser": "^7.2.0"
+  },
+  "keywords": ["poker", "timer", "tournament"],
+  "author": "",
+  "license": "MIT"
+}
